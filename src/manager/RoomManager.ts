@@ -259,7 +259,7 @@ export class RoomManager {
             this.playerList.forEach(player => {
                 this.participants[player].send(JSON.stringify({type : "playerList", playerList : this.playerList}))
             })
-            
+            console.log(this.playerList , this.roomState)
         }
 
         if(message.type === "ready"){
