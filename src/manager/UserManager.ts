@@ -48,6 +48,7 @@ export class UserManager {
             if(message.type === "CREATE_ROOM"){
                 const room = new RoomManager(socket, message.userId, message.roomId)
                 this.rooms.push(room)
+                console.log("this is the room created", room)
             }
 
             const room = this.rooms.find(room=> room.roomId === message.roomId);
