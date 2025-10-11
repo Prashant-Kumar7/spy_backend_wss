@@ -247,7 +247,7 @@ export class RoomManager {
         if(message.type === "join_room"){
 
             if(this.playerList.includes(message.userId)){
-                socket.send(JSON.stringify({type : "player_already_in_room"}))
+                socket.send(JSON.stringify({type : "player_already_in_room", roomState : this.roomState, playerList : this.playerList}))
                 return
             }
 
