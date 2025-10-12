@@ -238,9 +238,7 @@ export class RoomManager {
         if(message.type === "send_chat"){
             this.roomState.chats.push(message.chat)
             this.playerList.forEach(player => {
-                if(player !== message.userId){
-                    this.participants[player].send(JSON.stringify({type : "chat", chat : message.chat, userId : message.userId}))
-                }
+                this.participants[player].send(JSON.stringify({type : "chat", chat : message.chat, userId : message.userId}))
             })
         }
 
@@ -267,7 +265,7 @@ export class RoomManager {
             this.playerList.forEach(player => {
                 this.participants[player].send(JSON.stringify({type : "room_state", roomState : this.roomState}))
             })
-
+            console.log("condition for game to start is :", (Object.values(this.roomState.readyStatus).every(status => status)) && (this.playerList.length >= 3))
             if(Object.values(this.roomState.readyStatus).every(status => status) && this.playerList.length >= 3){
                 this.roomState.gameStarted = true
                 this.playerList.forEach(player => {

@@ -39,7 +39,7 @@ export class UserManager {
         socket.on("message" , (data)=>{
 
             const message = JSON.parse(data.toString())
-
+            console.log("message is :", message)
             // Store socket to userId mapping for any message that contains userId
             if (message.userId) {
                 this.socketToUserId.set(socket, message.userId);
