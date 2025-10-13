@@ -28,7 +28,8 @@ interface RoomState{
     }
     voting : Voting,
     civilianWord : string,
-    alivePlayers : string[]
+    alivePlayers : string[],
+    roundNo : number
 }
 
 
@@ -41,6 +42,8 @@ export class RoomManager {
     private roomState : RoomState
     private playerList : string[]
     private votingTimer : NodeJS.Timeout | null = null
+    private speakingTimer : NodeJS.Timeout | null = null
+    private currentSpeakerIndex : number = 0
     constructor (Hostsocket :WebSocket, userId : string, roomId : string){
         this.host = {
             socket : Hostsocket,
@@ -64,7 +67,8 @@ export class RoomManager {
             },
             voting : {},
             civilianWord : "",
-            alivePlayers : []
+            alivePlayers : [],
+            roundNo : 0
         }
     }
 
@@ -124,7 +128,7 @@ export class RoomManager {
         this.roomState.voting = {};
         this.roomState.civilianWord = "";
         this.roomState.alivePlayers = [];
-        
+        this.roomState.roundNo = 0;
         // Reset ready status for all players
         for (const playerId of this.playerList) {
             this.roomState.readyStatus[playerId] = false;
@@ -138,6 +142,10 @@ export class RoomManager {
         if (this.votingTimer) {
             clearTimeout(this.votingTimer);
             this.votingTimer = null;
+        }
+        if (this.speakingTimer) {
+            clearTimeout(this.speakingTimer);
+            this.speakingTimer = null;
         }
     }
 
@@ -210,28 +218,60 @@ export class RoomManager {
 
         // Continue the game - reset voting and start new speaking round
         this.roomState.voting = {};
+        this.roomState.roundNo++;
+        
+        // Send round number to all players
+        this.playerList.forEach(player => {
+            this.participants[player].send(JSON.stringify({type : "round_started", roundNo : this.roomState.roundNo}))
+        })
         
         // Start new speaking round
         await this.startSpeakingRound();
     }
 
     async startSpeakingRound() {
-        for (const speaker of this.roomState.alivePlayers) {
+        // Wait 3 seconds before starting speaking phase
+        await delay(3000);
+        
+        this.currentSpeakerIndex = 0;
+        this.nextSpeaker();
+    }
+
+    nextSpeaker() {
+        if (this.currentSpeakerIndex >= this.roomState.alivePlayers.length) {
+            // All players have spoken, start voting
             this.roomState.alivePlayers.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "speak_statement", currentSpeaker : speaker }))
+                this.participants[player].send(JSON.stringify({type : "start_voting"}))
             })
-            await delay(15000);
+
+            // Set timeout for voting and track it
+            this.votingTimer = setTimeout(() => {
+                this.handleVotingResults();
+            }, 10000);
+            return;
         }
 
-        // Start voting after speaking round
+        const currentSpeaker = this.roomState.alivePlayers[this.currentSpeakerIndex];
+        
+        // Notify all players about current speaker
         this.roomState.alivePlayers.forEach(player => {
-            this.participants[player].send(JSON.stringify({type : "start_voting"}))
+            this.participants[player].send(JSON.stringify({type : "speak_statement", currentSpeaker : currentSpeaker }))
         })
 
-        // Set timeout for voting and track it
-        this.votingTimer = setTimeout(() => {
-            this.handleVotingResults();
-        }, 10000);
+        // Set timer for current speaker
+        this.speakingTimer = setTimeout(() => {
+            this.currentSpeakerIndex++;
+            this.nextSpeaker();
+        }, 15000);
+    }
+
+    skipCurrentSpeaker() {
+        if (this.speakingTimer) {
+            clearTimeout(this.speakingTimer);
+            this.speakingTimer = null;
+        }
+        this.currentSpeakerIndex++;
+        this.nextSpeaker();
     }
 
     handleMessage(socket : WebSocket, message : any){
@@ -280,17 +320,26 @@ export class RoomManager {
                 this.roomState.spy.word = spyWord.spy
                 this.roomState.civilianWord = spyWord.civilian
 
-                if(this.participants[spyPlayer]){
-                    this.participants[spyPlayer].send(JSON.stringify({type : "spy", word : spyWord.spy, player : spyPlayer}))
+                // Wait 5 seconds before sending words
+                setTimeout(() => {
+                    if(this.participants[spyPlayer]){
+                        this.participants[spyPlayer].send(JSON.stringify({type : "spy", word : spyWord.spy, player : spyPlayer}))
+                        this.playerList.forEach(player => {
+                            if(player !== spyPlayer){
+                                this.participants[player].send(JSON.stringify({type : "civilianWord", word : spyWord.civilian, player : spyPlayer}))
+                            }
+                        })
+                    }
+                    
+                    // Send round number for first round
+                    this.roomState.roundNo = 1;
                     this.playerList.forEach(player => {
-                        if(player !== spyPlayer){
-                            this.participants[player].send(JSON.stringify({type : "civilianWord", word : spyWord.civilian, player : spyPlayer}))
-                        }
+                        this.participants[player].send(JSON.stringify({type : "round_started", roundNo : this.roomState.roundNo}))
                     })
-                }
-                
-                // Start the first speaking round
-                this.startSpeakingRound();
+                    
+                    // Start the first speaking round
+                    this.startSpeakingRound();
+                }, 5000);
             }
         }
 
@@ -384,6 +433,15 @@ export class RoomManager {
         //         this.roomState.chats = []
         //     }
         // }
+
+
+        if(message.type === "skip_speaking_statement"){
+            // Check if the user is the current speaker
+            const currentSpeaker = this.roomState.alivePlayers[this.currentSpeakerIndex];
+            if(currentSpeaker === message.userId && this.roomState.gameStarted) {
+                this.skipCurrentSpeaker();
+            }
+        }
     }
 }
 
