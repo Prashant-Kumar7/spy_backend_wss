@@ -274,6 +274,53 @@ export class RoomManager {
         this.nextSpeaker();
     }
 
+    startGameCountdown() {
+        // Send countdown messages to all players
+        this.playerList.forEach(player => {
+            this.participants[player].send(JSON.stringify({type : "countdown", seconds: 3}))
+        })
+
+        // Countdown from 3 to 1
+        setTimeout(() => {
+            this.playerList.forEach(player => {
+                this.participants[player].send(JSON.stringify({type : "countdown", seconds: 2}))
+            })
+        }, 1000)
+
+        setTimeout(() => {
+            this.playerList.forEach(player => {
+                this.participants[player].send(JSON.stringify({type : "countdown", seconds: 1}))
+            })
+        }, 2000)
+
+        // After 3 seconds, start the actual game
+        setTimeout(() => {
+            this.playerList.forEach(player => {
+                this.participants[player].send(JSON.stringify({type : "countdown", seconds: 0}))
+            })
+            
+            // Send spy/civilian words to players
+            const spyPlayer = this.roomState.spy.player;
+            if(this.participants[spyPlayer]){
+                this.participants[spyPlayer].send(JSON.stringify({type : "spy", word : this.roomState.spy.word, player : spyPlayer}))
+                this.playerList.forEach(player => {
+                    if(player !== spyPlayer){
+                        this.participants[player].send(JSON.stringify({type : "civilianWord", word : this.roomState.civilianWord, player : spyPlayer}))
+                    }
+                })
+            }
+            
+            // Send round number for first round
+            this.roomState.roundNo = 1;
+            this.playerList.forEach(player => {
+                this.participants[player].send(JSON.stringify({type : "round_started", roundNo : this.roomState.roundNo}))
+            })
+            
+            // Start the first speaking round
+            this.startSpeakingRound();
+        }, 3000)
+    }
+
     handleMessage(socket : WebSocket, message : any){
         if(message.type === "send_chat"){
             this.roomState.chats.push(message.chat)
@@ -324,27 +371,9 @@ export class RoomManager {
                 this.roomState.spy.player = spyPlayer
                 this.roomState.spy.word = spyWord.spy
                 this.roomState.civilianWord = spyWord.civilian
-
-                // Wait 5 seconds before sending words
-                setTimeout(() => {
-                    if(this.participants[spyPlayer]){
-                        this.participants[spyPlayer].send(JSON.stringify({type : "spy", word : spyWord.spy, player : spyPlayer}))
-                        this.playerList.forEach(player => {
-                            if(player !== spyPlayer){
-                                this.participants[player].send(JSON.stringify({type : "civilianWord", word : spyWord.civilian, player : spyPlayer}))
-                            }
-                        })
-                    }
-                    
-                    // Send round number for first round
-                    this.roomState.roundNo = 1;
-                    this.playerList.forEach(player => {
-                        this.participants[player].send(JSON.stringify({type : "round_started", roundNo : this.roomState.roundNo}))
-                    })
-                    
-                    // Start the first speaking round
-                    this.startSpeakingRound();
-                }, 5000);
+                
+                // Start 3-second countdown before game begins
+                this.startGameCountdown();
             }
         }
 
