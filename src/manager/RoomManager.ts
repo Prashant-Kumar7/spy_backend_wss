@@ -355,7 +355,7 @@ export class RoomManager {
         if(message.type === "ready"){
             this.roomState.readyStatus[message.userId] = true
             this.playerList.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "room_state", roomState : this.roomState}))
+                this.participants[player].send(JSON.stringify({type : "player_ready", playerId : message.userId}))
             })
             console.log("condition for game to start is :", (Object.values(this.roomState.readyStatus).every(status => status)) && (this.playerList.length >= 3))
             if(Object.values(this.roomState.readyStatus).every(status => status) && this.playerList.length >= 3){
@@ -408,13 +408,13 @@ export class RoomManager {
             }
             
             this.playerList.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "room_state", roomState : this.roomState}))
+                this.participants[player].send(JSON.stringify({type : "voting", voting : this.roomState.voting}))
             })
         }
 
         if(message.type === "notready"){
             this.roomState.readyStatus[message.userId] = false
-            socket.send(JSON.stringify({type : "room_state", roomState : this.roomState}))
+            socket.send(JSON.stringify({type : "player_not_ready", playerId : message.userId}))
         }
 
         if(message.type === "leave_room"){
