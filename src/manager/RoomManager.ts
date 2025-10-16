@@ -149,6 +149,32 @@ export class RoomManager {
         }
     }
 
+    cleanupDisconnectedPlayers() {
+        // Remove disconnected players from alivePlayers array
+        this.roomState.alivePlayers = this.roomState.alivePlayers.filter(player => 
+            this.participants[player] !== undefined
+        );
+        
+        // Remove disconnected players from playerList
+        this.playerList = this.playerList.filter(player => 
+            this.participants[player] !== undefined
+        );
+        
+        // Remove disconnected players from readyStatus
+        Object.keys(this.roomState.readyStatus).forEach(player => {
+            if (!this.participants[player]) {
+                delete this.roomState.readyStatus[player];
+            }
+        });
+        
+        // Remove disconnected players from voting
+        Object.keys(this.roomState.voting).forEach(player => {
+            if (!this.participants[player]) {
+                delete this.roomState.voting[player];
+            }
+        });
+    }
+
     clearVotingTimer() {
         if (this.votingTimer) {
             clearTimeout(this.votingTimer);
@@ -178,21 +204,28 @@ export class RoomManager {
     }
 
     async handleVotingResults() {
+        // Clean up disconnected players before proceeding
+        this.cleanupDisconnectedPlayers();
+        
         // Calculate who got the most votes
         const maxVotesResult = this.calculateMaxVotes();
         
         this.playerList.forEach(player => {
-            this.participants[player].send(JSON.stringify({
-                type : "end_voting",
-                votingResults: this.roomState.voting,
-                maxVotes: maxVotesResult
-            }))
+            if (this.participants[player]) {
+                this.participants[player].send(JSON.stringify({
+                    type : "end_voting",
+                    votingResults: this.roomState.voting,
+                    maxVotes: maxVotesResult
+                }))
+            }
         })
 
         // Check if spy was caught (civilian wins)
         if(maxVotesResult?.player === this.roomState.spy.player){
             this.playerList.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "game_ended", winner: "civilians", spy : this.roomState.spy.player}))
+                if (this.participants[player]) {
+                    this.participants[player].send(JSON.stringify({type : "game_ended", winner: "civilians", spy : this.roomState.spy.player}))
+                }
             })
             this.resetGameState();
             return;
@@ -204,13 +237,17 @@ export class RoomManager {
         }
 
         this.playerList.forEach(player => {
-            this.participants[player].send(JSON.stringify({type : "alivePlayers", alivePlayers : this.roomState.alivePlayers}))
+            if (this.participants[player]) {
+                this.participants[player].send(JSON.stringify({type : "alivePlayers", alivePlayers : this.roomState.alivePlayers}))
+            }
         })
 
         // Check if spy wins (only 2 players left)
         if(this.roomState.alivePlayers.length === 2){
             this.playerList.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "game_ended", winner: "spy", spy : this.roomState.spy.player}))
+                if (this.participants[player]) {
+                    this.participants[player].send(JSON.stringify({type : "game_ended", winner: "spy", spy : this.roomState.spy.player}))
+                }
             })
             this.resetGameState();
             return;
@@ -222,7 +259,9 @@ export class RoomManager {
         
         // Send round number to all players
         this.playerList.forEach(player => {
-            this.participants[player].send(JSON.stringify({type : "round_started", roundNo : this.roomState.roundNo}))
+            if (this.participants[player]) {
+                this.participants[player].send(JSON.stringify({type : "round_started", roundNo : this.roomState.roundNo}))
+            }
         })
         
         // Start new speaking round
@@ -238,10 +277,26 @@ export class RoomManager {
     }
 
     nextSpeaker() {
+        // Clean up disconnected players before proceeding
+        this.cleanupDisconnectedPlayers();
+        
+        // Adjust current speaker index if it's out of bounds after cleanup
+        if (this.currentSpeakerIndex >= this.roomState.alivePlayers.length) {
+            this.currentSpeakerIndex = 0;
+        }
+        
+        // If no players are alive, end the game
+        if (this.roomState.alivePlayers.length === 0) {
+            this.resetGameState();
+            return;
+        }
+        
         if (this.currentSpeakerIndex >= this.roomState.alivePlayers.length) {
             // All players have spoken, start voting
             this.roomState.alivePlayers.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "start_voting"}))
+                if (this.participants[player]) {
+                    this.participants[player].send(JSON.stringify({type : "start_voting"}))
+                }
             })
 
             // Set timeout for voting and track it
@@ -255,7 +310,9 @@ export class RoomManager {
         
         // Notify all players about current speaker
         this.roomState.alivePlayers.forEach(player => {
-            this.participants[player].send(JSON.stringify({type : "speak_statement", currentSpeaker : currentSpeaker }))
+            if (this.participants[player]) {
+                this.participants[player].send(JSON.stringify({type : "speak_statement", currentSpeaker : currentSpeaker }))
+            }
         })
 
         // Set timer for current speaker
@@ -277,26 +334,34 @@ export class RoomManager {
     startGameCountdown() {
         // Send countdown messages to all players
         this.playerList.forEach(player => {
-            this.participants[player].send(JSON.stringify({type : "countdown", seconds: 3}))
+            if (this.participants[player]) {
+                this.participants[player].send(JSON.stringify({type : "countdown", seconds: 3}))
+            }
         })
 
         // Countdown from 3 to 1
         setTimeout(() => {
             this.playerList.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "countdown", seconds: 2}))
+                if (this.participants[player]) {
+                    this.participants[player].send(JSON.stringify({type : "countdown", seconds: 2}))
+                }
             })
         }, 1000)
 
         setTimeout(() => {
             this.playerList.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "countdown", seconds: 1}))
+                if (this.participants[player]) {
+                    this.participants[player].send(JSON.stringify({type : "countdown", seconds: 1}))
+                }
             })
         }, 2000)
 
         // After 3 seconds, start the actual game
         setTimeout(() => {
             this.playerList.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "countdown", seconds: 0}))
+                if (this.participants[player]) {
+                    this.participants[player].send(JSON.stringify({type : "countdown", seconds: 0}))
+                }
             })
             
             // Send spy/civilian words to players
@@ -304,7 +369,7 @@ export class RoomManager {
             if(this.participants[spyPlayer]){
                 this.participants[spyPlayer].send(JSON.stringify({type : "spy", word : this.roomState.spy.word, player : spyPlayer}))
                 this.playerList.forEach(player => {
-                    if(player !== spyPlayer){
+                    if(player !== spyPlayer && this.participants[player]){
                         this.participants[player].send(JSON.stringify({type : "civilianWord", word : this.roomState.civilianWord, player : spyPlayer}))
                     }
                 })
@@ -313,7 +378,9 @@ export class RoomManager {
             // Send round number for first round
             this.roomState.roundNo = 1;
             this.playerList.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "round_started", roundNo : this.roomState.roundNo}))
+                if (this.participants[player]) {
+                    this.participants[player].send(JSON.stringify({type : "round_started", roundNo : this.roomState.roundNo}))
+                }
             })
             
             // Start the first speaking round
@@ -325,7 +392,9 @@ export class RoomManager {
         if(message.type === "send_chat"){
             this.roomState.chats.push(message.chat)
             this.playerList.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "chat", chat : message.chat, userId : message.userId}))
+                if (this.participants[player]) {
+                    this.participants[player].send(JSON.stringify({type : "chat", chat : message.chat, userId : message.userId}))
+                }
             })
         }
 
@@ -336,7 +405,9 @@ export class RoomManager {
                 socket.send(JSON.stringify({type : "room_state", roomState : this.roomState}))
 
                 this.playerList.forEach(player => {
-                    this.participants[player].send(JSON.stringify({type : "playerList", playerList : this.playerList}))
+                    if (this.participants[player]) {
+                        this.participants[player].send(JSON.stringify({type : "playerList", playerList : this.playerList}))
+                    }
                 })
                 return
             }
@@ -347,7 +418,9 @@ export class RoomManager {
             socket.send(JSON.stringify({type : "room_state", roomState : this.roomState}))
 
             this.playerList.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "playerList", playerList : this.playerList}))
+                if (this.participants[player]) {
+                    this.participants[player].send(JSON.stringify({type : "playerList", playerList : this.playerList}))
+                }
             })
             console.log(this.playerList , this.roomState)
         }
@@ -355,13 +428,17 @@ export class RoomManager {
         if(message.type === "ready"){
             this.roomState.readyStatus[message.userId] = true
             this.playerList.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "player_ready", playerId : message.userId}))
+                if (this.participants[player]) {
+                    this.participants[player].send(JSON.stringify({type : "player_ready", playerId : message.userId}))
+                }
             })
             console.log("condition for game to start is :", (Object.values(this.roomState.readyStatus).every(status => status)) && (this.playerList.length >= 3))
             if(Object.values(this.roomState.readyStatus).every(status => status) && this.playerList.length >= 3){
                 this.roomState.gameStarted = true
                 this.playerList.forEach(player => {
-                    this.participants[player].send(JSON.stringify({type : "gameStarted", gameStarted : true}))
+                    if (this.participants[player]) {
+                        this.participants[player].send(JSON.stringify({type : "gameStarted", gameStarted : true}))
+                    }
                 })
                 this.roomState.alivePlayers = this.playerList
                 const spyWord = this.pickRandomWord()
@@ -408,8 +485,11 @@ export class RoomManager {
             }
             
             this.playerList.forEach(player => {
-                this.participants[player].send(JSON.stringify({type : "voting", voting : this.roomState.voting}))
+                if (this.participants[player]) {
+                    this.participants[player].send(JSON.stringify({type : "voting", voting : this.roomState.voting}))
+                }
             })
+            console.log("votes for round :",this.roomState.roundNo, "are :", this.roomState.voting)
         }
 
         if(message.type === "notready"){
@@ -433,7 +513,9 @@ export class RoomManager {
 
             if(this.roomState.gameStarted && message.userId === this.roomState.spy.player){
                 this.playerList.forEach(player => {
-                    this.participants[player].send(JSON.stringify({type : "game_ended", winner: "civilians", spy : this.roomState.spy.player}))
+                    if (this.participants[player]) {
+                        this.participants[player].send(JSON.stringify({type : "game_ended", winner: "civilians", spy : this.roomState.spy.player}))
+                    }
                 })
                 this.resetGameState();
             }
@@ -442,12 +524,16 @@ export class RoomManager {
                 this.clearVotingTimer();
                 
                 this.playerList.forEach(player => {
-                    this.participants[player].send(JSON.stringify({type : "player_left", playerLeft : message.userId}))
+                    if (this.participants[player]) {
+                        this.participants[player].send(JSON.stringify({type : "player_left", playerLeft : message.userId}))
+                    }
                 })
             }
             else {
                 this.playerList.forEach(player => {
-                    this.participants[player].send(JSON.stringify({type : "room_state", roomState : this.roomState}))
+                    if (this.participants[player]) {
+                        this.participants[player].send(JSON.stringify({type : "room_state", roomState : this.roomState}))
+                    }
                 })
             }
 
