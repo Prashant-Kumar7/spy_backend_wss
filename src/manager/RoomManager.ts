@@ -312,7 +312,7 @@ export class RoomManager {
             // Set timeout for voting and track it
             this.votingTimer = setTimeout(() => {
                 this.handleVotingResults();
-            }, 10000);
+            }, 15000);
             return;
         }
 
