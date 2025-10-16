@@ -236,6 +236,9 @@ export class RoomManager {
             maxVotes: maxVotesResult
         }))
 
+        // Wait 4 seconds before proceeding with game logic
+        await delay(4000);
+
         // Check if spy was caught (civilian wins)
         if(maxVotesResult?.player === this.roomState.spy.player){
             this.playerList.forEach(player => {
