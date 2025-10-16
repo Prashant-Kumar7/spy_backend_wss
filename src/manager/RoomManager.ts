@@ -230,6 +230,12 @@ export class RoomManager {
             }
         })
 
+        console.log(JSON.stringify({
+            type : "end_voting",
+            votingResults: this.roomState.voting,
+            maxVotes: maxVotesResult
+        }))
+
         // Check if spy was caught (civilian wins)
         if(maxVotesResult?.player === this.roomState.spy.player){
             this.playerList.forEach(player => {
@@ -237,6 +243,11 @@ export class RoomManager {
                     this.participants[player].send(JSON.stringify({type : "game_ended", winner: "civilians", spy : this.roomState.spy.player}))
                 }
             })
+            console.log(JSON.stringify({
+                type : "game_ended",
+                winner: "civilians",
+                spy : this.roomState.spy.player
+            }))
             this.resetGameState();
             return;
         }
@@ -259,6 +270,11 @@ export class RoomManager {
                     this.participants[player].send(JSON.stringify({type : "game_ended", winner: "spy", spy : this.roomState.spy.player}))
                 }
             })
+            console.log(JSON.stringify({
+                type : "game_ended",
+                winner: "spy",
+                spy : this.roomState.spy.player
+            }))
             this.resetGameState();
             return;
         }
@@ -496,11 +512,11 @@ export class RoomManager {
                 this.roomState.voting[message.votedPlayer].push(message.userId);
             }
             
-            this.playerList.forEach(player => {
-                if (this.participants[player]) {
-                    this.participants[player].send(JSON.stringify({type : "voting", voting : this.roomState.voting}))
-                }
-            })
+            // this.playerList.forEach(player => {
+            //     if (this.participants[player]) {
+            //         this.participants[player].send(JSON.stringify({type : "voting", voting : this.roomState.voting}))
+            //     }
+            // })
             console.log("votes for round :",this.roomState.roundNo, "are :", this.roomState.voting)
         }
 
