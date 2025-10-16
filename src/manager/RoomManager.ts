@@ -150,6 +150,9 @@ export class RoomManager {
     }
 
     cleanupDisconnectedPlayers() {
+        const originalAlivePlayers = [...this.roomState.alivePlayers];
+        const originalPlayerList = [...this.playerList];
+        
         // Remove disconnected players from alivePlayers array
         this.roomState.alivePlayers = this.roomState.alivePlayers.filter(player => 
             this.participants[player] !== undefined
@@ -173,6 +176,13 @@ export class RoomManager {
                 delete this.roomState.voting[player];
             }
         });
+        
+        // Log if any players were removed
+        if (originalAlivePlayers.length !== this.roomState.alivePlayers.length) {
+            console.log(`cleanupDisconnectedPlayers: Removed ${originalAlivePlayers.length - this.roomState.alivePlayers.length} players from alivePlayers`);
+            console.log(`Original: [${originalAlivePlayers.join(', ')}]`);
+            console.log(`After cleanup: [${this.roomState.alivePlayers.join(', ')}]`);
+        }
     }
 
     clearVotingTimer() {
@@ -280,18 +290,18 @@ export class RoomManager {
         // Clean up disconnected players before proceeding
         this.cleanupDisconnectedPlayers();
         
-        // Adjust current speaker index if it's out of bounds after cleanup
-        if (this.currentSpeakerIndex >= this.roomState.alivePlayers.length) {
-            this.currentSpeakerIndex = 0;
-        }
+        console.log(`nextSpeaker called - currentSpeakerIndex: ${this.currentSpeakerIndex}, alivePlayers.length: ${this.roomState.alivePlayers.length}, alivePlayers: [${this.roomState.alivePlayers.join(', ')}]`);
         
         // If no players are alive, end the game
         if (this.roomState.alivePlayers.length === 0) {
+            console.log("No players alive, resetting game state");
             this.resetGameState();
             return;
         }
         
+        // Check if all players have spoken (current speaker index is at or beyond the end)
         if (this.currentSpeakerIndex >= this.roomState.alivePlayers.length) {
+            console.log("All players have spoken, starting voting phase");
             // All players have spoken, start voting
             this.roomState.alivePlayers.forEach(player => {
                 if (this.participants[player]) {
@@ -317,6 +327,7 @@ export class RoomManager {
 
         // Set timer for current speaker
         this.speakingTimer = setTimeout(() => {
+            console.log(`Speaker timer expired, incrementing currentSpeakerIndex from ${this.currentSpeakerIndex} to ${this.currentSpeakerIndex + 1}`);
             this.currentSpeakerIndex++;
             this.nextSpeaker();
         }, 15000);
@@ -327,6 +338,7 @@ export class RoomManager {
             clearTimeout(this.speakingTimer);
             this.speakingTimer = null;
         }
+        console.log(`Speaker skipped, incrementing currentSpeakerIndex from ${this.currentSpeakerIndex} to ${this.currentSpeakerIndex + 1}`);
         this.currentSpeakerIndex++;
         this.nextSpeaker();
     }
