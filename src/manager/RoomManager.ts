@@ -100,23 +100,25 @@ export class RoomManager {
 
     calculateMaxVotes(): { player: string; votes: number } | null {
         let maxVotes = 0;
-        let maxVotedPlayer = '';
+        let maxVotedPlayers: string[] = [];
         
         // Count votes for each player
         for (const [player, voters] of Object.entries(this.roomState.voting)) {
             const voteCount = voters.length;
             if (voteCount > maxVotes) {
                 maxVotes = voteCount;
-                maxVotedPlayer = player;
+                maxVotedPlayers = [player];
+            } else if (voteCount === maxVotes && voteCount > 0) {
+                maxVotedPlayers.push(player);
             }
         }
         
-        // Return null if no votes were cast
-        if (maxVotes === 0) {
+        // Return null if no votes were cast or if there's a tie
+        if (maxVotes === 0 || maxVotedPlayers.length > 1) {
             return null;
         }
         
-        return { player: maxVotedPlayer, votes: maxVotes };
+        return { player: maxVotedPlayers[0], votes: maxVotes };
     }
 
     resetGameState() {
@@ -255,10 +257,11 @@ export class RoomManager {
             return;
         }
 
-        // Remove the voted player from alive players
+        // Remove the voted player from alive players (only if there's a clear winner, not a tie)
         if(maxVotesResult?.player) {
             this.roomState.alivePlayers = this.roomState.alivePlayers.filter(player => player !== maxVotesResult.player);
         }
+        // If maxVotesResult is null (tie or no votes), no one is eliminated and we continue the game
 
         this.playerList.forEach(player => {
             if (this.participants[player]) {
