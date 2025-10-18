@@ -43,6 +43,7 @@ export class RoomManager {
     private playerList : string[]
     private votingTimer : NodeJS.Timeout | null = null
     private speakingTimer : NodeJS.Timeout | null = null
+    private countdownTimers : NodeJS.Timeout[] = []
     private currentSpeakerIndex : number = 0
     constructor (Hostsocket :WebSocket, userId : string, roomId : string){
         this.host = {
@@ -149,6 +150,9 @@ export class RoomManager {
             clearTimeout(this.speakingTimer);
             this.speakingTimer = null;
         }
+        // Clear all countdown timers
+        this.countdownTimers.forEach(timer => clearTimeout(timer));
+        this.countdownTimers = [];
     }
 
     cleanupDisconnectedPlayers() {
@@ -253,6 +257,7 @@ export class RoomManager {
                 winner: "civilians",
                 spy : this.roomState.spy.player
             }))
+            this.clearAllTimers();
             this.resetGameState();
             return;
         }
@@ -281,6 +286,7 @@ export class RoomManager {
                 winner: "spy",
                 spy : this.roomState.spy.player
             }))
+            this.clearAllTimers();
             this.resetGameState();
             return;
         }
@@ -317,6 +323,7 @@ export class RoomManager {
         // If no players are alive, end the game
         if (this.roomState.alivePlayers.length === 0) {
             console.log("No players alive, resetting game state");
+            this.clearAllTimers();
             this.resetGameState();
             return;
         }
@@ -374,24 +381,24 @@ export class RoomManager {
         })
 
         // Countdown from 3 to 1
-        setTimeout(() => {
+        this.countdownTimers.push(setTimeout(() => {
             this.playerList.forEach(player => {
                 if (this.participants[player]) {
                     this.participants[player].send(JSON.stringify({type : "countdown", seconds: 2}))
                 }
             })
-        }, 1000)
+        }, 1000))
 
-        setTimeout(() => {
+        this.countdownTimers.push(setTimeout(() => {
             this.playerList.forEach(player => {
                 if (this.participants[player]) {
                     this.participants[player].send(JSON.stringify({type : "countdown", seconds: 1}))
                 }
             })
-        }, 2000)
+        }, 2000))
 
         // After 3 seconds, start the actual game
-        setTimeout(() => {
+        this.countdownTimers.push(setTimeout(() => {
             this.playerList.forEach(player => {
                 if (this.participants[player]) {
                     this.participants[player].send(JSON.stringify({type : "countdown", seconds: 0}))
@@ -419,7 +426,7 @@ export class RoomManager {
             
             // Start the first speaking round
             this.startSpeakingRound();
-        }, 3000)
+        }, 3000))
     }
 
     handleMessage(socket : WebSocket, message : any){
@@ -551,11 +558,12 @@ export class RoomManager {
                         this.participants[player].send(JSON.stringify({type : "game_ended", winner: "civilians", spy : this.roomState.spy.player}))
                     }
                 })
+                this.clearAllTimers();
                 this.resetGameState();
             }
             else if(this.roomState.gameStarted && message.userId !== this.roomState.spy.player){
-                // Clear voting timer if game is in progress
-                this.clearVotingTimer();
+                // Clear all timers if game is in progress
+                this.clearAllTimers();
                 
                 this.playerList.forEach(player => {
                     if (this.participants[player]) {
