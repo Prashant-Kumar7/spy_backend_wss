@@ -34,6 +34,12 @@ export class UserManager {
         this.socketToUserId.delete(socket);
     }
 
+    removeRoom(roomToRemove: RoomManager) {
+        console.log(`Removing room ${roomToRemove.roomId} from rooms list`);
+        this.rooms = this.rooms.filter(room => room !== roomToRemove);
+        console.log(`Remaining rooms: ${this.rooms.length}`);
+    }
+
 
     addHandler(socket : WebSocket){
         socket.on("message" , (data)=>{
@@ -46,7 +52,9 @@ export class UserManager {
             }
 
             if(message.type === "CREATE_ROOM"){
-                const room = new RoomManager(socket, message.userId, message.roomId)
+                const room = new RoomManager(socket, message.userId, message.roomId, () => {
+                    this.removeRoom(room)
+                })
                 this.rooms.push(room)
                 console.log("this is the room created", room)
             }
@@ -59,6 +67,13 @@ export class UserManager {
             else{
                 room.handleMessage(socket, message)
             }
+        })
+
+        socket.on("close", ()=>{
+            console.log("socket closed")
+            this.removeUser(socket)
+            
+            console.log("user removed")
         })
 
     }

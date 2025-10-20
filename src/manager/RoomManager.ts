@@ -45,13 +45,16 @@ export class RoomManager {
     private speakingTimer : NodeJS.Timeout | null = null
     private countdownTimers : NodeJS.Timeout[] = []
     private currentSpeakerIndex : number = 0
-    constructor (Hostsocket :WebSocket, userId : string, roomId : string){
+    private onRoomEmptyCallback?: () => void
+    
+    constructor (Hostsocket :WebSocket, userId : string, roomId : string, onRoomEmptyCallback?: () => void){
         this.host = {
             socket : Hostsocket,
             userId : userId
         }
 
         this.roomId = roomId
+        this.onRoomEmptyCallback = onRoomEmptyCallback
         this.participants = {
             [this.host.userId] : this.host.socket
         }
@@ -301,7 +304,7 @@ export class RoomManager {
                 this.participants[player].send(JSON.stringify({type : "round_started", roundNo : this.roomState.roundNo}))
             }
         })
-        
+        await delay(1000);
         // Start new speaking round
         await this.startSpeakingRound();
     }
@@ -398,7 +401,7 @@ export class RoomManager {
         }, 2000))
 
         // After 3 seconds, start the actual game
-        this.countdownTimers.push(setTimeout(() => {
+        this.countdownTimers.push(setTimeout(async () => {
             this.playerList.forEach(player => {
                 if (this.participants[player]) {
                     this.participants[player].send(JSON.stringify({type : "countdown", seconds: 0}))
@@ -423,7 +426,7 @@ export class RoomManager {
                     this.participants[player].send(JSON.stringify({type : "round_started", roundNo : this.roomState.roundNo}))
                 }
             })
-            
+            await delay(1000);
             // Start the first speaking round
             this.startSpeakingRound();
         }, 3000))
@@ -544,8 +547,11 @@ export class RoomManager {
                 delete this.participants[message.userId]
                 this.playerList = this.playerList.filter(player => player !== message.userId)
                 this.host.socket.close()
-                this.host.userId = this.playerList[0]
-                this.host.socket = this.participants[this.host.userId]
+                // Check if there are still players left to assign new host
+                if (this.playerList.length > 0) {
+                    this.host.userId = this.playerList[0]
+                    this.host.socket = this.participants[this.host.userId]
+                }
             }
 
             delete this.participants[message.userId]
@@ -563,7 +569,7 @@ export class RoomManager {
             }
             else if(this.roomState.gameStarted && message.userId !== this.roomState.spy.player){
                 // Clear all timers if game is in progress
-                this.clearAllTimers();
+                // this.clearAllTimers();
                 
                 this.playerList.forEach(player => {
                     if (this.participants[player]) {
@@ -579,7 +585,8 @@ export class RoomManager {
                 })
             }
 
-            
+            // Check if room is empty and cleanup if needed
+            this.checkAndCleanupRoom();
         }
 
         // if(message.type === "leave_room"){
@@ -604,6 +611,32 @@ export class RoomManager {
                 this.skipCurrentSpeaker();
             }
         }
+    }
+
+    isRoomEmpty(): boolean {
+        return this.playerList.length === 0
+    }
+
+    checkAndCleanupRoom() {
+        if (this.isRoomEmpty()) {
+            console.log(`Room ${this.roomId} is empty, cleaning up...`)
+            this.clearAllTimers()
+            this.resetGameState()
+            
+            // Notify UserManager to remove this room
+            if (this.onRoomEmptyCallback) {
+                this.onRoomEmptyCallback()
+            }
+        }
+    }
+
+    closeRoom(){
+        this.host.socket.close()
+        delete this.participants[this.host.userId]
+        this.playerList = this.playerList.filter(player => player !== this.host.userId)
+        delete this.roomState.readyStatus[this.host.userId]
+        this.clearAllTimers()
+        this.resetGameState()
     }
 }
 
