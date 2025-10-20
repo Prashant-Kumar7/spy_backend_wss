@@ -546,7 +546,7 @@ export class RoomManager {
             if(message.userId === this.host.userId){
                 delete this.participants[message.userId]
                 this.playerList = this.playerList.filter(player => player !== message.userId)
-                this.host.socket.close()
+                // this.host.socket.close()
                 // Check if there are still players left to assign new host
                 if (this.playerList.length > 0) {
                     this.host.userId = this.playerList[0]
@@ -631,7 +631,7 @@ export class RoomManager {
     }
 
     closeRoom(){
-        this.host.socket.close()
+        // this.host.socket.close()
         delete this.participants[this.host.userId]
         this.playerList = this.playerList.filter(player => player !== this.host.userId)
         delete this.roomState.readyStatus[this.host.userId]
