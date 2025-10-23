@@ -52,11 +52,16 @@ export class UserManager {
             }
 
             if(message.type === "CREATE_ROOM"){
-                const room = new RoomManager(socket, message.userId, message.roomId, () => {
+                const room = new RoomManager(socket, message.userId, message.roomId, message.gameMode = "", () => {
                     this.removeRoom(room)
                 })
                 this.rooms.push(room)
                 console.log("this is the room created", room)
+            }
+
+            if(message.type === "QUICK_JOIN"){
+                const randomRoom = this.rooms[Math.floor(Math.random() * this.rooms.length)]
+                socket.send(JSON.stringify({type : "quick_join_response", roomId : randomRoom.roomId}))
             }
 
             const room = this.rooms.find(room=> room.roomId === message.roomId);

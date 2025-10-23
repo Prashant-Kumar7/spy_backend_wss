@@ -37,7 +37,7 @@ interface RoomState{
 export class RoomManager {
     private host : Host;
     private participants : Participant;
-
+    public gameMode : string
     public roomId : string
     private roomState : RoomState
     private playerList : string[]
@@ -47,12 +47,12 @@ export class RoomManager {
     private currentSpeakerIndex : number = 0
     private onRoomEmptyCallback?: () => void
     
-    constructor (Hostsocket :WebSocket, userId : string, roomId : string, onRoomEmptyCallback?: () => void){
+    constructor (Hostsocket :WebSocket, userId : string, roomId : string, gameMode : string, onRoomEmptyCallback?: () => void){
         this.host = {
             socket : Hostsocket,
             userId : userId
         }
-
+        this.gameMode = gameMode
         this.roomId = roomId
         this.onRoomEmptyCallback = onRoomEmptyCallback
         this.participants = {
@@ -445,6 +445,7 @@ export class RoomManager {
         if(message.type === "join_room"){
 
             if(this.playerList.includes(message.userId)){
+                this.participants[message.userId] = socket
                 // socket.send(JSON.stringify({type : "player_already_in_room", roomState : this.roomState, playerList : this.playerList}))
                 socket.send(JSON.stringify({type : "room_state", roomState : this.roomState}))
 
@@ -455,6 +456,12 @@ export class RoomManager {
                 })
                 return
             }
+
+            if(this.playerList.length >= 6){
+                socket.send(JSON.stringify({type : "room_full"}))
+                return
+            }
+            socket.send(JSON.stringify({type : "room_seat_available", userId : message.userId}))
 
             this.participants[message.userId] = socket
             this.playerList.push(message.userId)
