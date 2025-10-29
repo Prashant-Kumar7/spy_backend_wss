@@ -8,6 +8,17 @@ const app = express();
 app.get("/",(_,res)=>{
     res.json("hello from word spy websocket server")
 })
+
+export const options = {
+    method: 'GET',
+    url: 'https://pictionary-charades-word-generator.p.rapidapi.com/charades',
+    params: {difficulty: 'easy'},
+    headers: {
+      'x-rapidapi-key': process.env.RAPIDAPI_KEY,
+      'x-rapidapi-host': 'pictionary-charades-word-generator.p.rapidapi.com'
+    }
+};
+
 const httpServer = app.listen(8080);
 const wss = new WebSocketServer({ server: httpServer });
 const userManger = new UserManager();

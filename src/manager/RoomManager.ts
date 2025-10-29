@@ -448,6 +448,7 @@ export class RoomManager {
                 this.participants[message.userId] = socket
                 // socket.send(JSON.stringify({type : "player_already_in_room", roomState : this.roomState, playerList : this.playerList}))
                 socket.send(JSON.stringify({type : "room_state", roomState : this.roomState}))
+                socket.send(JSON.stringify({type : "game_mode", gameMode : this.gameMode}))
 
                 this.playerList.forEach(player => {
                     if (this.participants[player]) {
@@ -497,7 +498,12 @@ export class RoomManager {
                 
                 // Store the spy player in room state
                 this.roomState.spy.player = spyPlayer
-                this.roomState.spy.word = spyWord.spy
+                if(this.gameMode === "word_spy"){
+                    this.roomState.spy.word = spyWord.spy
+                }
+                else{
+                    this.roomState.spy.word = "Wordless"
+                }
                 this.roomState.civilianWord = spyWord.civilian
                 
                 // Start 3-second countdown before game begins

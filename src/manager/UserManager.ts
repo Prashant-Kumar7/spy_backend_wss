@@ -1,18 +1,20 @@
 import { WebSocket } from "ws";
 import { RoomManager } from "./RoomManager.js";
-
+import { SkribbleRoomManager } from "./SkribbleRoom.js";
 
 
 
 export class UserManager {
     // private rooms : 
-    private rooms : RoomManager[]
+    private spyRooms : RoomManager[]
     private users : WebSocket[];
+    private skribbleRooms : SkribbleRoomManager[]
     private socketToUserId : Map<WebSocket, string>;
 
     constructor(){
-        this.rooms = []
+        this.spyRooms = []
         this.users = [];
+        this.skribbleRooms = [];
         this.socketToUserId = new Map();
     }
 
@@ -26,7 +28,7 @@ export class UserManager {
         this.users = this.users.filter(user => user !== socket);
         
         // Find and handle user leaving from all rooms
-        this.rooms.forEach(room => {
+        this.spyRooms.forEach(room => {
             room.handleDisconnection(socket);
         });
         
@@ -34,12 +36,93 @@ export class UserManager {
         this.socketToUserId.delete(socket);
     }
 
-    removeRoom(roomToRemove: RoomManager) {
+    removeSpyRoom(roomToRemove: RoomManager) {
         console.log(`Removing room ${roomToRemove.roomId} from rooms list`);
-        this.rooms = this.rooms.filter(room => room !== roomToRemove);
-        console.log(`Remaining rooms: ${this.rooms.length}`);
+        this.spyRooms = this.spyRooms.filter(room => room !== roomToRemove);
+        console.log(`Remaining rooms: ${this.spyRooms.length}`);
     }
 
+
+    SpyGameEventHandler(socket : WebSocket, message : any){
+        if(message.type === "CREATE_ROOM"){
+            const room = new RoomManager(socket, message.userId, message.roomId, message.gameMode = "word_spy", () => {
+                this.removeSpyRoom(room)
+            })
+            this.spyRooms.push(room)
+            console.log("this is the room created", room)
+        }
+
+        if(message.type === "QUICK_JOIN_WORD_SPY"){
+            const roomGameModeList = this.spyRooms.filter(room => room.gameMode === "word_spy")
+            const randomRoom = roomGameModeList[Math.floor(Math.random() * roomGameModeList.length)]
+            socket.send(JSON.stringify({type : "quick_join_response", roomId : randomRoom.roomId, gameMode : "word_spy"}))
+        }
+
+        if(message.type === "QUICK_JOIN_WORDLESS_SPY"){
+            const roomGameModeList = this.spyRooms.filter(room => room.gameMode === "wordless_spy")
+            const randomRoom = roomGameModeList[Math.floor(Math.random() * roomGameModeList.length)]
+            socket.send(JSON.stringify({type : "quick_join_response", roomId : randomRoom.roomId, gameMode : "wordless_spy"}))
+        }
+
+        const room = this.spyRooms.find((room: RoomManager) => room.roomId === message.roomId);
+
+        if(!room){
+            socket.send(JSON.stringify({type : "spy_room_not_found"}))
+        }
+        else{
+            room.handleMessage(socket, message)
+        }
+    }
+
+
+    SkribbleGameEventHandler(socket : WebSocket, message : any){
+        const username = message.name
+        const room = this.skribbleRooms.find((rm: SkribbleRoomManager) => rm.roomId === message.roomId);
+        switch (message.type) {
+            case "CREATE_ROOM":
+                const newRoom = new SkribbleRoomManager(message.roomId, message.username)
+                this.skribbleRooms.push(newRoom)
+                console.log("this is the skribble room created", newRoom)
+                break;
+            case "JOIN_ROOM":
+                room?.join(username, socket as WebSocket);
+                break;
+            case "GET_ROOM_STATE":
+                room?.getRoomState(socket);
+                break;
+            case "MESSAGE" : 
+                room?.message(socket as WebSocket, message)
+                break;
+            case "START_DRAWING" : 
+                room?.drawEvent(socket as WebSocket, message)
+                break;
+            case "STOP_DRAWING" :
+                room?.drawEvent(socket as WebSocket, message)
+                break;
+            case "DRAW":
+                room?.drawEvent(socket as WebSocket, message)
+                break;
+            case  "CLEAR" : 
+                room?.drawEvent(socket as WebSocket, message)
+                break;
+            case "START_GAME" : 
+                room?.startGame(socket as WebSocket, message)
+                break;
+            case "GET_WORD":
+                room?.secondTimerOfGame(socket as WebSocket, message)
+                
+                break;
+            case "TIMER":
+                // room?.secondTimerOfGame(socket)
+                break;
+            case "ROUND_END":
+                room?.stopSecondTimer(socket as WebSocket)
+                break;
+            default:
+                console.warn("Unhandled message type:", message.type);
+                break;
+        }
+    }
 
     addHandler(socket : WebSocket){
         socket.on("message" , (data)=>{
@@ -51,27 +134,14 @@ export class UserManager {
                 this.socketToUserId.set(socket, message.userId);
             }
 
-            if(message.type === "CREATE_ROOM"){
-                const room = new RoomManager(socket, message.userId, message.roomId, message.gameMode = "", () => {
-                    this.removeRoom(room)
-                })
-                this.rooms.push(room)
-                console.log("this is the room created", room)
+            if(message.EventFrom === "SpyGame"){
+                this.SpyGameEventHandler(socket, message)
+            }
+            else if(message.EventFrom === "SkribbleGame"){
+                this.SkribbleGameEventHandler(socket, message)
             }
 
-            if(message.type === "QUICK_JOIN"){
-                const randomRoom = this.rooms[Math.floor(Math.random() * this.rooms.length)]
-                socket.send(JSON.stringify({type : "quick_join_response", roomId : randomRoom.roomId}))
-            }
-
-            const room = this.rooms.find(room=> room.roomId === message.roomId);
-
-            if(!room){
-                socket.send(JSON.stringify({type : "room_not_found"}))
-            }
-            else{
-                room.handleMessage(socket, message)
-            }
+            
         })
 
         socket.on("close", ()=>{
