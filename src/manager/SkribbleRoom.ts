@@ -248,8 +248,8 @@ export class SkribbleRoomManager {
 
     message(socket : WebSocket, message : any){
         this.Players.forEach((user)=>{
-            if(socket != this.participants[user.name]){
-                this.participants[user.name]?.send(JSON.stringify(message))
+            if(socket != this.participants[user.userId]){
+                this.participants[user.userId]?.send(JSON.stringify(message))
             }
         })
     }
@@ -261,8 +261,8 @@ export class SkribbleRoomManager {
     drawEvent(socket: WebSocket, parsedMessage : any){
         
         this.Players.forEach((user)=>{
-            if(socket != this.participants[user.name]){
-                this.participants[user.name]?.send(JSON.stringify(parsedMessage))
+            if(socket != this.participants[user.userId]){
+                this.participants[user.userId]?.send(JSON.stringify(parsedMessage))
             }
         })
     }
@@ -296,9 +296,9 @@ export class SkribbleRoomManager {
         this.GameState.wordToGuess = result.data.word
         this.Players.forEach((user)=>{
             if(user===this.Players[this.GameState.indexOfUser]){
-                this.participants[user.name]?.send(JSON.stringify({type : "GET_WORD", word : this.GameState.wordToGuess, gameSetting : this.GameSetting, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId}))
+                this.participants[user.userId]?.send(JSON.stringify({type : "GET_WORD", word : this.GameState.wordToGuess, gameSetting : this.GameSetting, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId}))
             }else{
-                this.participants[user.name]?.send(JSON.stringify({type : "WORD_LENGTH", wordLength : this.GameState.wordToGuess.length, gameSetting : this.GameSetting, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId}))
+                this.participants[user.userId]?.send(JSON.stringify({type : "WORD_LENGTH", wordLength : this.GameState.wordToGuess.length, gameSetting : this.GameSetting, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId}))
             }
         })
         this.GameState.secondTimer = setInterval(() => {
@@ -307,11 +307,11 @@ export class SkribbleRoomManager {
                 const randomNumber: number = getRandomNumberInRange(0,this.GameState.wordToGuess.length-1, this.GameState.reveledIndex)
                 this.GameState.reveledIndex.push(randomNumber)
                 this.Players.forEach((user)=>{
-                    this.participants[user.name]?.send(JSON.stringify({type : "SECOND_TIMER", time: this.GameState.secondTime, reveledIndex : randomNumber, letterReveled : this.GameState.wordToGuess[randomNumber]}))
+                    this.participants[user.userId]?.send(JSON.stringify({type : "SECOND_TIMER", time: this.GameState.secondTime, reveledIndex : randomNumber, letterReveled : this.GameState.wordToGuess[randomNumber]}))
                 })
             }else {
                 this.Players.forEach((user)=>{
-                    this.participants[user.name]?.send(JSON.stringify({type : "SECOND_TIMER", time: this.GameState.secondTime}))
+                    this.participants[user.userId]?.send(JSON.stringify({type : "SECOND_TIMER", time: this.GameState.secondTime}))
                 })
             } 
             
@@ -337,7 +337,7 @@ export class SkribbleRoomManager {
                 if(!user.wordGuessed){
                     user.score = user.score + 0
                 }
-                this.participants[user.name]?.send(
+                this.participants[user.userId]?.send(
                     JSON.stringify({ type: "SECOND_TIMER_STOPPED", time: 0, roundScore : this.GameState.roundOverScoreState })
                 );
             });
@@ -361,8 +361,8 @@ export class SkribbleRoomManager {
                     this.GameState.secondTime = 0;
                     setTimeout(()=>{
                         this.Players.forEach((user)=>{
-                            this.GameState.roundOverScoreState[user.name] = 0
-                            this.participants[user.name]?.send(JSON.stringify({type: "GAME_OVER", time: 0, ScoreCard : this.Players}))
+                            this.GameState.roundOverScoreState[user.userId] = 0
+                            this.participants[user.userId]?.send(JSON.stringify({type: "GAME_OVER", time: 0, ScoreCard : this.Players}))
                         })
                     },5000)
                     
@@ -374,11 +374,11 @@ export class SkribbleRoomManager {
             this.GameState.wordToGuess = result.data.word
             setTimeout(()=>{
                 this.Players.forEach((user) => {
-                    this.GameState.roundOverScoreState[user.name] = 0
+                    this.GameState.roundOverScoreState[user.userId] = 0
                     if(user===this.Players[this.GameState.indexOfUser]){
-                        this.participants[user.name]?.send(JSON.stringify({ type: "WORD", word : this.GameState.wordToGuess, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId }));
+                        this.participants[user.userId]?.send(JSON.stringify({ type: "WORD", word : this.GameState.wordToGuess, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId }));
                     }else{
-                        this.participants[user.name]?.send(JSON.stringify({ type: "WORD_LENGTH", wordLength : this.GameState.wordToGuess.length, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId }));
+                        this.participants[user.userId]?.send(JSON.stringify({ type: "WORD_LENGTH", wordLength : this.GameState.wordToGuess.length, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId }));
                     }
                 });
             },4000)
@@ -393,11 +393,11 @@ export class SkribbleRoomManager {
                         const randomNumber: number = getRandomNumberInRange(0,this.GameState.wordToGuess.length-1, this.GameState.reveledIndex)
                         this.GameState.reveledIndex.push(randomNumber)
                         this.Players.forEach((user)=>{
-                            this.participants[user.name]?.send(JSON.stringify({type : "SECOND_TIMER", time: this.GameState.secondTime, reveledIndex : randomNumber, letterReveled : this.GameState.wordToGuess[randomNumber],word : this.GameState.wordToGuess}))
+                            this.participants[user.userId]?.send(JSON.stringify({type : "SECOND_TIMER", time: this.GameState.secondTime, reveledIndex : randomNumber, letterReveled : this.GameState.wordToGuess[randomNumber],word : this.GameState.wordToGuess}))
                         })
                     }else {
                         this.Players.forEach((user) => {
-                            this.participants[user.name]?.send(
+                            this.participants[user.userId]?.send(
                                 JSON.stringify({ type: "SECOND_TIMER", time: this.GameState.secondTime, word : this.GameState.wordToGuess })
                             );
                         });
@@ -428,7 +428,7 @@ export class SkribbleRoomManager {
             this.GameState.secondTimer = null;
             this.GameState.secondTime = 0;
             this.Players.forEach((user)=>{
-                this.participants[user.name]?.send(JSON.stringify({type: "GAME_OVER", time: 0}))
+            this.participants[user.userId]?.send(JSON.stringify({type: "GAME_OVER", time: 0}))
             })
         }
     }
