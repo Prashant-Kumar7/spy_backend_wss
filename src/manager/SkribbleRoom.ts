@@ -174,6 +174,12 @@ export class SkribbleRoomManager {
     //     this.usernames = this.usernames.sort(function(){return 0.5 - Math.random()})
     // }
 
+    sendPlayersList(){
+        this.Players.forEach((user)=>{
+            this.participants[user.userId]?.send(JSON.stringify({type : "PLAYERS", players : this.Players, userId : user.userId}))
+        })
+    }
+
     startGame(socket : WebSocket, parsedMessage : any){
         if(socket === this.host.socket){
             // this.randomizePlayers()

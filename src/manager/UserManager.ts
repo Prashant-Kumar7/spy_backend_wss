@@ -82,6 +82,7 @@ export class UserManager {
             case "CREATE_SKRIBBLE_ROOM":
                 const newRoom = new SkribbleRoomManager(message.roomId, message.userId, message.PlayerName = "host",socket as WebSocket)
                 this.skribbleRooms.push(newRoom)
+                newRoom.sendPlayersList()
                 console.log("this is the skribble room created", newRoom)
                 break;
             case "JOIN_SKRIBBLE_ROOM":
