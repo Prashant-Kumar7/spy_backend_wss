@@ -254,51 +254,51 @@ export class SkribbleRoomManager {
     //     })
     // }
 
-    // message(ws : WebSocket, parsedMessage : any){
-    //     const word  = this.GameState.wordToGuess
-    //     if(parsedMessage.message===this.GameState.wordToGuess){
-    //         let score: number
-    //         this.usernames.forEach((user)=>{
-    //             if(user.name===parsedMessage.userId){
-    //                 user.wordGuessed = true
-    //                 if(this.GameState.secondTime < this.GameSetting.timeSlot*0.20){
-    //                     this.GameState.roundOverScoreState[user.name] = 200
-    //                     user.score = user.score + this.GameState.roundOverScoreState[user.name]
-    //                 }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.40){
-    //                     this.GameState.roundOverScoreState[user.name] = (0.80)*200
-    //                     user.score = user.score + this.GameState.roundOverScoreState[user.name]
-    //                 }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.60){
-    //                     this.GameState.roundOverScoreState[user.name] = (0.60)*200
-    //                     user.score = user.score + this.GameState.roundOverScoreState[user.name]
-    //                 }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.80){
-    //                     this.GameState.roundOverScoreState[user.name] = (0.40)*200
-    //                     user.score = user.score + this.GameState.roundOverScoreState[user.name]
-    //                 }else {
-    //                     this.GameState.roundOverScoreState[user.name] = (0.20)*200
-    //                     user.score = user.score + this.GameState.roundOverScoreState[user.name]
-    //                 }
-    //             }
-    //             this.participants[user.name]?.send(JSON.stringify({type : "WORD_MATCHED", message: `${parsedMessage.userId} : Guessed the word`, username : parsedMessage.username}))
-    //         })
-    //     }else if(word.slice(0, this.GameState.wordToGuess.length-1) === parsedMessage.message){
-    //         this.usernames.forEach((user)=>{
-    //             this.participants[user.name]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.userId} : Close guess`}))
-    //         })
-    //     }else {
-    //         this.usernames.forEach((user)=>{
-    //             this.participants[user.name]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.userId} : ${parsedMessage.message}`}))
-    //         })
-    //     }
+    message(ws : WebSocket, parsedMessage : any){
+        const word  = this.GameState.wordToGuess
+        if(parsedMessage.message===this.GameState.wordToGuess){
+            let score: number
+            this.Players.forEach((user)=>{
+                if(user.userId===parsedMessage.userId){
+                    user.wordGuessed = true
+                    if(this.GameState.secondTime < this.GameSetting.timeSlot*0.20){
+                        this.GameState.roundOverScoreState[user.userId] = 200
+                        user.score = user.score + this.GameState.roundOverScoreState[user.userId]
+                    }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.40){
+                        this.GameState.roundOverScoreState[user.userId] = (0.80)*200
+                        user.score = user.score + this.GameState.roundOverScoreState[user.userId]
+                    }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.60){
+                        this.GameState.roundOverScoreState[user.userId] = (0.60)*200
+                        user.score = user.score + this.GameState.roundOverScoreState[user.userId]
+                    }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.80){
+                        this.GameState.roundOverScoreState[user.userId] = (0.40)*200
+                        user.score = user.score + this.GameState.roundOverScoreState[user.userId]
+                    }else {
+                        this.GameState.roundOverScoreState[user.userId] = (0.20)*200
+                        user.score = user.score + this.GameState.roundOverScoreState[user.userId]
+                    }
+                }
+                this.participants[user.userId]?.send(JSON.stringify({type : "WORD_MATCHED", message: `${parsedMessage.userId} : Guessed the word`, userId : parsedMessage.userId}))
+            })
+        }else if(word.slice(0, this.GameState.wordToGuess.length-1) === parsedMessage.message){
+            this.Players.forEach((user)=>{
+                this.participants[user.userId]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.userId} : Close guess`}))
+            })
+        }else {
+            this.Players.forEach((user)=>{
+                this.participants[user.userId]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.userId} : ${parsedMessage.message}`}))
+            })
+        }
         
-    // }
-
-    message(socket : WebSocket, message : any){
-        this.Players.forEach((user)=>{
-            if(socket != this.participants[user.userId]){
-                this.participants[user.userId]?.send(JSON.stringify(message))
-            }
-        })
     }
+
+    // message(socket : WebSocket, message : any){
+    //     this.Players.forEach((user)=>{
+    //         if(socket != this.participants[user.userId]){
+    //             this.participants[user.userId]?.send(JSON.stringify(message))
+    //         }
+    //     })
+    // }
 
     getRoomState(socket: WebSocket){
         
