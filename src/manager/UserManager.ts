@@ -80,9 +80,12 @@ export class UserManager {
         const room = this.skribbleRooms.find((rm: SkribbleRoomManager) => rm.roomId === message.roomId);
         switch (message.type) {
             case "CREATE_SKRIBBLE_ROOM":
-                const newRoom = new SkribbleRoomManager(message.roomId, message.userId)
+                const newRoom = new SkribbleRoomManager(message.roomId, message.userId, message.PlayerName = "host",socket as WebSocket)
                 this.skribbleRooms.push(newRoom)
                 console.log("this is the skribble room created", newRoom)
+                break;
+            case "JOIN_SKRIBBLE_ROOM":
+                room?.joinRoom(socket as WebSocket, message);
                 break;
             case "SKRIBBLE_TOOL_CHANGE":
                 room?.drawEvent(socket as WebSocket, message)
@@ -102,9 +105,7 @@ export class UserManager {
             case "SKRIBBLE_REDO":
                 room?.drawEvent(socket as WebSocket, message)
                 break;
-            case "JOIN_SKRIBBLE_ROOM":
-                room?.joinRoom(socket as WebSocket, message);
-                break;
+            
             case "GET_SKRIBBLE_ROOM_STATE":
                 room?.getRoomState(socket);
                 break;

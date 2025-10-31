@@ -14,7 +14,7 @@ interface Users {
 
 interface Host {
     socket : WebSocket | null
-    username : string
+    userId : string
 }
 
 interface GameSettings {
@@ -58,14 +58,22 @@ export class SkribbleRoomManager {
     private GameSetting : GameSettings
 
 
-    constructor(roomId : string, username : string){
-        this.participants = {}
+    constructor(roomId : string, userId : string, PlayerName : string,socket : WebSocket){
+        this.participants = {
+            [userId] : socket
+        }
         this.roomId = roomId
         this.host = {
-            username : username,
-            socket : null
+            userId : userId,
+            socket : socket
         }
-        this.Players = []
+        this.Players = [{
+            userId : userId,
+            name : PlayerName,
+            score : 0,
+            wordGuessed : false,
+            avatar : ""
+        }]
         this.GameState = {
             currentDrawing : null,
             wordToGuess : "",
@@ -74,7 +82,9 @@ export class SkribbleRoomManager {
             secondTimer: null,
             currentRoundNo : 0,
             reveledIndex : [],
-            roundOverScoreState : {}
+            roundOverScoreState : {
+                [userId] : 0
+            }
         }
         this.GameSetting = {
             noOfRounds : 0,
@@ -119,6 +129,8 @@ export class SkribbleRoomManager {
         this.Players.forEach((user)=>{
             this.participants[user.name]?.send(JSON.stringify({type : "PLAYERS", players : this.Players, userId : message.userId}))
         })
+
+        console.log("this is the players in the room", this.Players)
     }
     // randomizePlayers() {
     //     this.usernames = this.usernames.sort(function(){return 0.5 - Math.random()})
