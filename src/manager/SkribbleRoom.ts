@@ -47,6 +47,44 @@ interface Players {
     avatar : string
 }
 
+const WordList = [
+    // Easy words
+    "cat", "dog", "house", "car", "tree", "sun", "moon", "star", "bird", "fish",
+    "apple", "banana", "book", "pencil", "chair", "table", "bed", "door", "window", "phone",
+    "cake", "ice cream", "pizza", "hamburger", "sandwich", "cereal", "milk", "water", "coffee", "tea",
+    "hat", "shoes", "shirt", "pants", "jacket", "glasses", "watch", "bag", "umbrella", "keys",
+    "ball", "toy", "bike", "bicycle", "car", "bus", "train", "plane", "boat", "ship",
+    "guitar", "piano", "drum", "violin", "trumpet", "flute", "microphone", "radio", "television", "camera",
+    "flower", "garden", "beach", "mountain", "ocean", "river", "lake", "forest", "desert", "island",
+    "doctor", "teacher", "police", "firefighter", "chef", "farmer", "artist", "musician", "athlete", "scientist",
+    "elephant", "lion", "tiger", "bear", "rabbit", "mouse", "horse", "cow", "pig", "sheep",
+    "butterfly", "bee", "spider", "ant", "ladybug", "dragonfly", "grasshopper", "cricket", "beetle", "worm",
+    
+    // Medium words
+    "adventure", "journey", "vacation", "celebration", "party", "wedding", "birthday", "holiday", "festival", "parade",
+    "library", "museum", "school", "hospital", "restaurant", "hotel", "airport", "station", "park", "zoo",
+    "computer", "laptop", "keyboard", "mouse", "screen", "internet", "website", "email", "message", "download",
+    "basketball", "football", "soccer", "tennis", "baseball", "volleyball", "swimming", "running", "cycling", "dancing",
+    "butterfly", "dragon", "unicorn", "mermaid", "robot", "alien", "monster", "ghost", "witch", "wizard",
+    "superhero", "princess", "knight", "pirate", "ninja", "samurai", "cowboy", "detective", "explorer", "astronaut",
+    "mountain", "volcano", "waterfall", "cave", "bridge", "tunnel", "tower", "castle", "palace", "temple",
+    "sunset", "sunrise", "rainbow", "storm", "thunder", "lightning", "rain", "snow", "cloud", "wind",
+    "chocolate", "candy", "cookie", "bread", "butter", "cheese", "egg", "meat", "chicken", "rice",
+    "backpack", "suitcase", "wallet", "purse", "bracelet", "necklace", "ring", "earring", "belt", "tie",
+    
+    // Hard words
+    "philosophy", "mathematics", "architecture", "engineering", "psychology", "biology", "chemistry", "physics", "geography", "history",
+    "transformation", "revolution", "evolution", "discovery", "invention", "innovation", "creation", "destruction", "construction", "demolition",
+    "telescope", "microscope", "laboratory", "experiment", "hypothesis", "theory", "research", "study", "analysis", "investigation",
+    "gymnastics", "archaeology", "paleontology", "geology", "meteorology", "astronomy", "navigation", "exploration", "expedition", "mission",
+    "orchestra", "symphony", "opera", "ballet", "theater", "performance", "exhibition", "gallery", "sculpture", "painting",
+    "technology", "automation", "artificial", "intelligence", "virtual", "reality", "simulation", "animation", "digital", "electronic",
+    "photography", "cinematography", "documentary", "interview", "journalism", "reporting", "broadcasting", "streaming", "podcast", "vlog",
+    "entrepreneur", "business", "corporation", "industry", "commerce", "trade", "economy", "market", "investment", "finance",
+    "pharmaceutical", "medicine", "treatment", "therapy", "surgery", "diagnosis", "symptom", "disease", "recovery", "health",
+    "environment", "ecosystem", "biodiversity", "conservation", "preservation", "pollution", "recycling", "sustainability", "renewable", "energy"
+]
+
 
 export class SkribbleRoomManager {
     public participants : Users
@@ -164,28 +202,36 @@ export class SkribbleRoomManager {
         }
     }
 
-    async getRandomWord(){
-        const options = {
-            method: 'GET',
-            url: 'https://pictionary-charades-word-generator.p.rapidapi.com/pictionary',
-            params: {difficulty: 'easy'},
-            headers: {
-              'x-rapidapi-key': '3db60b20b3mshda7fd392c482e24p164e0fjsnc133203e3533',
-              'x-rapidapi-host': 'pictionary-charades-word-generator.p.rapidapi.com'
-            }
-        };
-
-        try {
-            const response = await axios.request(options);
-            this.GameState.wordToGuess = response.data.word
-            
-            this.Players.forEach((user)=>{
-                this.participants[user.name]?.send(JSON.stringify({type : "GET_WORD", word : this.GameState}))
-            })
-        } catch (error) {
-            console.error(error);
+    getRandomWord(){
+        // Select random word from word list based on difficulty
+        let filteredWords: string[] = [];
+        
+        if (this.GameSetting.diffuclty === "easy") {
+            // First 100 words (0-99) are easy
+            filteredWords = WordList.slice(0, 100);
+        } else if (this.GameSetting.diffuclty === "medium") {
+            // Next 100 words (100-199) are medium
+            filteredWords = WordList.slice(100, 200);
+        } else {
+            // Last 100 words (200-299) are hard
+            filteredWords = WordList.slice(200);
         }
         
+        // Fallback to all words if filtered list is empty
+        if (filteredWords.length === 0) {
+            filteredWords = WordList;
+        }
+        
+        // Pick random word from filtered list
+        const randomIndex = Math.floor(Math.random() * filteredWords.length);
+        this.GameState.wordToGuess = filteredWords[randomIndex];
+        
+        // Send word to all players
+        this.Players.forEach((user) => {
+            if (this.participants[user.userId]) {
+                this.participants[user.userId]?.send(JSON.stringify({type : "GET_WORD", word : this.GameState.wordToGuess}))
+            }
+        })
     }
 
 
