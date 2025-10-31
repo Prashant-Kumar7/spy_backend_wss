@@ -84,6 +84,24 @@ export class UserManager {
                 this.skribbleRooms.push(newRoom)
                 console.log("this is the skribble room created", newRoom)
                 break;
+            case "SKRIBBLE_TOOL_CHANGE":
+                room?.drawEvent(socket as WebSocket, message)
+                break;
+            case "SKRIBBLE_COLOR_CHANGE":
+                room?.drawEvent(socket as WebSocket, message)
+                break;
+            case "SKRIBBLE_WIDTH_CHANGE":
+                room?.drawEvent(socket as WebSocket, message)
+                break;
+            case "SKRIBBLE_STROKE":
+                room?.drawEvent(socket as WebSocket, message)
+                break;
+            case "SKRIBBLE_UNDO":
+                room?.drawEvent(socket as WebSocket, message)
+                break;
+            case "SKRIBBLE_REDO":
+                room?.drawEvent(socket as WebSocket, message)
+                break;
             case "JOIN_SKRIBBLE_ROOM":
                 room?.joinRoom(socket as WebSocket, message);
                 break;
