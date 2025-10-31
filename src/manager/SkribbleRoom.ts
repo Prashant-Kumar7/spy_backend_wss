@@ -40,6 +40,7 @@ interface GameState {
 
 
 interface Players {
+    userId : string,
     name : string,
     score : number,
     wordGuessed : boolean,
@@ -53,7 +54,7 @@ export class SkribbleRoomManager {
     private host : Host
     // private admin : WebSocket | null
     private GameState : GameState
-    private usernames : Players[]
+    private Players : Players[]
     private GameSetting : GameSettings
 
 
@@ -64,7 +65,7 @@ export class SkribbleRoomManager {
             username : username,
             socket : null
         }
-        this.usernames = []
+        this.Players = []
         this.GameState = {
             currentDrawing : null,
             wordToGuess : "",
@@ -82,23 +83,43 @@ export class SkribbleRoomManager {
         }
     }
 
-    joinHttp(username : string,avatar : string){
-        this.usernames.push({
-            name : username,
+    // joinHttp(username : string,avatar : string){
+    //     this.usernames.push({
+    //         name : username,
+    //         score : 0,
+    //         wordGuessed: false,
+    //         avatar  : avatar
+    //     })
+    //     this.participants = {
+    //         ...this.participants,
+    //         [username] : null
+    //     }
+    //     this.GameState.roundOverScoreState = {
+    //         ...this.GameState.roundOverScoreState,
+    //         [username] : 0
+    //     }
+    // }
+
+    joinRoom(socket : WebSocket, message : any){
+        this.Players.push({
+            userId : message.userId,
+            name : message.username,
             score : 0,
             wordGuessed: false,
-            avatar  : avatar
+            avatar  : message.avatar
         })
         this.participants = {
             ...this.participants,
-            [username] : null
+            [message.username] : socket
         }
         this.GameState.roundOverScoreState = {
             ...this.GameState.roundOverScoreState,
-            [username] : 0
+            [message.username] : 0
         }
+        this.Players.forEach((user)=>{
+            this.participants[user.name]?.send(JSON.stringify({type : "PLAYERS", players : this.Players, userId : message.userId}))
+        })
     }
-
     // randomizePlayers() {
     //     this.usernames = this.usernames.sort(function(){return 0.5 - Math.random()})
     // }
@@ -114,7 +135,7 @@ export class SkribbleRoomManager {
             }
 
             // this.gameState(socket, parsedMessage)
-            this.usernames.forEach((user)=>{
+            this.Players.forEach((user)=>{
                 if(socket != this.participants[user.name]){
                     this.participants[user.name]?.send(JSON.stringify({type : "START_GAME", payload : this.GameState}))
                 }
@@ -126,7 +147,7 @@ export class SkribbleRoomManager {
 
         this.GameState = {
             ...this.GameState,
-            currentDrawing : this.participants[this.usernames[this.GameState.indexOfUser].name],
+            currentDrawing : this.participants[this.Players[this.GameState.indexOfUser].name],
             wordToGuess : parsedMessage.word,
         }
     }
@@ -146,7 +167,7 @@ export class SkribbleRoomManager {
             const response = await axios.request(options);
             this.GameState.wordToGuess = response.data.word
             
-            this.usernames.forEach((user)=>{
+            this.Players.forEach((user)=>{
                 this.participants[user.name]?.send(JSON.stringify({type : "GET_WORD", word : this.GameState}))
             })
         } catch (error) {
@@ -159,63 +180,67 @@ export class SkribbleRoomManager {
     
 
 
-    join( username : string, socket : WebSocket){
-        if(this.host.username === username){
-            this.host.socket = socket
-        }
+    // join( username : string, socket : WebSocket){
+    //     if(this.host.username === username){
+    //         this.host.socket = socket
+    //     }
         
-        this.participants = {
-            ...this.participants,
-            [username] : socket
-        }
+    //     this.participants = {
+    //         ...this.participants,
+    //         [username] : socket
+    //     }
+        
 
-        this.usernames.forEach((user)=>{
-            this.participants[user.name]?.send(JSON.stringify({type : "PLAYERS", players : this.usernames, username : username}))
+    //     this.usernames.forEach((user)=>{
+    //         this.participants[user.name]?.send(JSON.stringify({type : "PLAYERS", players : this.usernames, username : username}))
+    //     })
+    // }
+
+    // message(ws : WebSocket, parsedMessage : any){
+    //     const word  = this.GameState.wordToGuess
+    //     if(parsedMessage.message===this.GameState.wordToGuess){
+    //         let score: number
+    //         this.usernames.forEach((user)=>{
+    //             if(user.name===parsedMessage.userId){
+    //                 user.wordGuessed = true
+    //                 if(this.GameState.secondTime < this.GameSetting.timeSlot*0.20){
+    //                     this.GameState.roundOverScoreState[user.name] = 200
+    //                     user.score = user.score + this.GameState.roundOverScoreState[user.name]
+    //                 }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.40){
+    //                     this.GameState.roundOverScoreState[user.name] = (0.80)*200
+    //                     user.score = user.score + this.GameState.roundOverScoreState[user.name]
+    //                 }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.60){
+    //                     this.GameState.roundOverScoreState[user.name] = (0.60)*200
+    //                     user.score = user.score + this.GameState.roundOverScoreState[user.name]
+    //                 }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.80){
+    //                     this.GameState.roundOverScoreState[user.name] = (0.40)*200
+    //                     user.score = user.score + this.GameState.roundOverScoreState[user.name]
+    //                 }else {
+    //                     this.GameState.roundOverScoreState[user.name] = (0.20)*200
+    //                     user.score = user.score + this.GameState.roundOverScoreState[user.name]
+    //                 }
+    //             }
+    //             this.participants[user.name]?.send(JSON.stringify({type : "WORD_MATCHED", message: `${parsedMessage.userId} : Guessed the word`, username : parsedMessage.username}))
+    //         })
+    //     }else if(word.slice(0, this.GameState.wordToGuess.length-1) === parsedMessage.message){
+    //         this.usernames.forEach((user)=>{
+    //             this.participants[user.name]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.userId} : Close guess`}))
+    //         })
+    //     }else {
+    //         this.usernames.forEach((user)=>{
+    //             this.participants[user.name]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.userId} : ${parsedMessage.message}`}))
+    //         })
+    //     }
+        
+    // }
+
+    message(socket : WebSocket, message : any){
+        this.Players.forEach((user)=>{
+            if(socket != this.participants[user.name]){
+                this.participants[user.name]?.send(JSON.stringify(message))
+            }
         })
     }
-
-    message(ws : WebSocket, parsedMessage : any){
-
-        
-
-        const word  = this.GameState.wordToGuess
-        if(parsedMessage.message===this.GameState.wordToGuess){
-            let score: number
-            this.usernames.forEach((user)=>{
-                if(user.name===parsedMessage.username){
-                    user.wordGuessed = true
-                    if(this.GameState.secondTime < this.GameSetting.timeSlot*0.20){
-                        this.GameState.roundOverScoreState[user.name] = 200
-                        user.score = user.score + this.GameState.roundOverScoreState[user.name]
-                    }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.40){
-                        this.GameState.roundOverScoreState[user.name] = (0.80)*200
-                        user.score = user.score + this.GameState.roundOverScoreState[user.name]
-                    }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.60){
-                        this.GameState.roundOverScoreState[user.name] = (0.60)*200
-                        user.score = user.score + this.GameState.roundOverScoreState[user.name]
-                    }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.80){
-                        this.GameState.roundOverScoreState[user.name] = (0.40)*200
-                        user.score = user.score + this.GameState.roundOverScoreState[user.name]
-                    }else {
-                        this.GameState.roundOverScoreState[user.name] = (0.20)*200
-                        user.score = user.score + this.GameState.roundOverScoreState[user.name]
-                    }
-                }
-                this.participants[user.name]?.send(JSON.stringify({type : "WORD_MATCHED", message: `${parsedMessage.username} : Guessed the word`, username : parsedMessage.username}))
-            })
-        }else if(word.slice(0, this.GameState.wordToGuess.length-1) === parsedMessage.message){
-            this.usernames.forEach((user)=>{
-                this.participants[user.name]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.username} : Close guess`}))
-            })
-        }else {
-            this.usernames.forEach((user)=>{
-                this.participants[user.name]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.username} : ${parsedMessage.message}`}))
-            })
-        }
-        
-    }
-
-    
 
     getRoomState(socket: WebSocket){
         
@@ -223,7 +248,7 @@ export class SkribbleRoomManager {
 
     drawEvent(socket: WebSocket, parsedMessage : any){
         
-        this.usernames.forEach((user)=>{
+        this.Players.forEach((user)=>{
             if(socket != this.participants[user.name]){
                 this.participants[user.name]?.send(JSON.stringify(parsedMessage))
             }
@@ -257,11 +282,11 @@ export class SkribbleRoomManager {
 
         const result = await axios.request(options)
         this.GameState.wordToGuess = result.data.word
-        this.usernames.forEach((user)=>{
-            if(user===this.usernames[this.GameState.indexOfUser]){
-                this.participants[user.name]?.send(JSON.stringify({type : "GET_WORD", word : this.GameState.wordToGuess, gameSetting : this.GameSetting, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.usernames[this.GameState.indexOfUser].name}))
+        this.Players.forEach((user)=>{
+            if(user===this.Players[this.GameState.indexOfUser]){
+                this.participants[user.name]?.send(JSON.stringify({type : "GET_WORD", word : this.GameState.wordToGuess, gameSetting : this.GameSetting, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId}))
             }else{
-                this.participants[user.name]?.send(JSON.stringify({type : "WORD_LENGTH", wordLength : this.GameState.wordToGuess.length, gameSetting : this.GameSetting, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.usernames[this.GameState.indexOfUser].name}))
+                this.participants[user.name]?.send(JSON.stringify({type : "WORD_LENGTH", wordLength : this.GameState.wordToGuess.length, gameSetting : this.GameSetting, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId}))
             }
         })
         this.GameState.secondTimer = setInterval(() => {
@@ -269,11 +294,11 @@ export class SkribbleRoomManager {
             if(this.GameState.secondTime > this.GameSetting.timeSlot/2 && this.GameState.reveledIndex.length===0){
                 const randomNumber: number = getRandomNumberInRange(0,this.GameState.wordToGuess.length-1, this.GameState.reveledIndex)
                 this.GameState.reveledIndex.push(randomNumber)
-                this.usernames.forEach((user)=>{
+                this.Players.forEach((user)=>{
                     this.participants[user.name]?.send(JSON.stringify({type : "SECOND_TIMER", time: this.GameState.secondTime, reveledIndex : randomNumber, letterReveled : this.GameState.wordToGuess[randomNumber]}))
                 })
             }else {
-                this.usernames.forEach((user)=>{
+                this.Players.forEach((user)=>{
                     this.participants[user.name]?.send(JSON.stringify({type : "SECOND_TIMER", time: this.GameState.secondTime}))
                 })
             } 
@@ -296,7 +321,7 @@ export class SkribbleRoomManager {
             this.GameState.secondTime = 0;
             // Notify clients that the timer has stopped
 
-            this.usernames.forEach((user) => {
+            this.Players.forEach((user) => {
                 if(!user.wordGuessed){
                     user.score = user.score + 0
                 }
@@ -307,7 +332,7 @@ export class SkribbleRoomManager {
 
 
             
-            if(this.GameState.indexOfUser < this.usernames.length - 1){
+            if(this.GameState.indexOfUser < this.Players.length - 1){
                 this.GameState.indexOfUser = this.GameState.indexOfUser + 1 
             }else {
                 this.GameState.indexOfUser = 0
@@ -323,9 +348,9 @@ export class SkribbleRoomManager {
                     this.GameState.secondTimer = null;
                     this.GameState.secondTime = 0;
                     setTimeout(()=>{
-                        this.usernames.forEach((user)=>{
+                        this.Players.forEach((user)=>{
                             this.GameState.roundOverScoreState[user.name] = 0
-                            this.participants[user.name]?.send(JSON.stringify({type: "GAME_OVER", time: 0, ScoreCard : this.usernames}))
+                            this.participants[user.name]?.send(JSON.stringify({type: "GAME_OVER", time: 0, ScoreCard : this.Players}))
                         })
                     },5000)
                     
@@ -336,12 +361,12 @@ export class SkribbleRoomManager {
             const result = await axios.request(options)
             this.GameState.wordToGuess = result.data.word
             setTimeout(()=>{
-                this.usernames.forEach((user) => {
+                this.Players.forEach((user) => {
                     this.GameState.roundOverScoreState[user.name] = 0
-                    if(user===this.usernames[this.GameState.indexOfUser]){
-                        this.participants[user.name]?.send(JSON.stringify({ type: "WORD", word : this.GameState.wordToGuess, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.usernames[this.GameState.indexOfUser].name }));
+                    if(user===this.Players[this.GameState.indexOfUser]){
+                        this.participants[user.name]?.send(JSON.stringify({ type: "WORD", word : this.GameState.wordToGuess, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId }));
                     }else{
-                        this.participants[user.name]?.send(JSON.stringify({ type: "WORD_LENGTH", wordLength : this.GameState.wordToGuess.length, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.usernames[this.GameState.indexOfUser].name }));
+                        this.participants[user.name]?.send(JSON.stringify({ type: "WORD_LENGTH", wordLength : this.GameState.wordToGuess.length, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId }));
                     }
                 });
             },4000)
@@ -355,11 +380,11 @@ export class SkribbleRoomManager {
 
                         const randomNumber: number = getRandomNumberInRange(0,this.GameState.wordToGuess.length-1, this.GameState.reveledIndex)
                         this.GameState.reveledIndex.push(randomNumber)
-                        this.usernames.forEach((user)=>{
+                        this.Players.forEach((user)=>{
                             this.participants[user.name]?.send(JSON.stringify({type : "SECOND_TIMER", time: this.GameState.secondTime, reveledIndex : randomNumber, letterReveled : this.GameState.wordToGuess[randomNumber],word : this.GameState.wordToGuess}))
                         })
                     }else {
-                        this.usernames.forEach((user) => {
+                        this.Players.forEach((user) => {
                             this.participants[user.name]?.send(
                                 JSON.stringify({ type: "SECOND_TIMER", time: this.GameState.secondTime, word : this.GameState.wordToGuess })
                             );
@@ -390,7 +415,7 @@ export class SkribbleRoomManager {
             clearInterval(this.GameState.secondTimer);
             this.GameState.secondTimer = null;
             this.GameState.secondTime = 0;
-            this.usernames.forEach((user)=>{
+            this.Players.forEach((user)=>{
                 this.participants[user.name]?.send(JSON.stringify({type: "GAME_OVER", time: 0}))
             })
         }

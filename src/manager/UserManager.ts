@@ -76,46 +76,46 @@ export class UserManager {
 
 
     SkribbleGameEventHandler(socket : WebSocket, message : any){
-        const username = message.name
+        // const userId = message.userId
         const room = this.skribbleRooms.find((rm: SkribbleRoomManager) => rm.roomId === message.roomId);
         switch (message.type) {
-            case "CREATE_ROOM":
-                const newRoom = new SkribbleRoomManager(message.roomId, message.username)
+            case "CREATE_SKRIBBLE_ROOM":
+                const newRoom = new SkribbleRoomManager(message.roomId, message.userId)
                 this.skribbleRooms.push(newRoom)
                 console.log("this is the skribble room created", newRoom)
                 break;
-            case "JOIN_ROOM":
-                room?.join(username, socket as WebSocket);
+            case "JOIN_SKRIBBLE_ROOM":
+                room?.joinRoom(socket as WebSocket, message);
                 break;
-            case "GET_ROOM_STATE":
+            case "GET_SKRIBBLE_ROOM_STATE":
                 room?.getRoomState(socket);
                 break;
-            case "MESSAGE" : 
+            case "SKRIBBLE_MESSAGE" : 
                 room?.message(socket as WebSocket, message)
                 break;
-            case "START_DRAWING" : 
+            case "START_SKRIBBLE_DRAWING" : 
                 room?.drawEvent(socket as WebSocket, message)
                 break;
-            case "STOP_DRAWING" :
+            case "STOP_SKRIBBLE_DRAWING" :
                 room?.drawEvent(socket as WebSocket, message)
                 break;
-            case "DRAW":
+            case "SKRIBBLE_DRAW":
                 room?.drawEvent(socket as WebSocket, message)
                 break;
-            case  "CLEAR" : 
+            case  "SKRIBBLE_CLEAR" : 
                 room?.drawEvent(socket as WebSocket, message)
                 break;
-            case "START_GAME" : 
+            case "START_SKRIBBLE_GAME" : 
                 room?.startGame(socket as WebSocket, message)
                 break;
-            case "GET_WORD":
+            case "GET_SKRIBBLE_WORD":
                 room?.secondTimerOfGame(socket as WebSocket, message)
                 
                 break;
-            case "TIMER":
+            case "SKRIBBLE_TIMER":
                 // room?.secondTimerOfGame(socket)
                 break;
-            case "ROUND_END":
+            case "SKRIBBLE_ROUND_END":
                 room?.stopSecondTimer(socket as WebSocket)
                 break;
             default:
