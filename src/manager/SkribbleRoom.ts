@@ -309,7 +309,7 @@ export class SkribbleRoomManager {
     }
 
     drawEvent(socket: WebSocket, parsedMessage : any){
-        
+        console.log("this is the parsed message from the skribble room manager", parsedMessage)
         this.Players.forEach((user)=>{
             if(socket != this.participants[user.userId]){
                 this.participants[user.userId]?.send(JSON.stringify(parsedMessage))
