@@ -151,18 +151,18 @@ export class SkribbleRoomManager {
     joinRoom(socket : WebSocket, message : any){
         this.Players.push({
             userId : message.userId,
-            name : message.username,
+            name : message.name,
             score : 0,
             wordGuessed: false,
             avatar  : message.avatar
         })
         this.participants = {
             ...this.participants,
-            [message.username] : socket
+            [message.userId] : socket
         }
         this.GameState.roundOverScoreState = {
             ...this.GameState.roundOverScoreState,
-            [message.username] : 0
+            [message.userId] : 0
         }
         this.Players.forEach((user)=>{
             this.participants[user.userId]?.send(JSON.stringify({type : "PLAYERS", players : this.Players, userId : message.userId}))
@@ -190,8 +190,8 @@ export class SkribbleRoomManager {
 
             // this.gameState(socket, parsedMessage)
             this.Players.forEach((user)=>{
-                if(socket != this.participants[user.name]){
-                    this.participants[user.name]?.send(JSON.stringify({type : "START_GAME", payload : this.GameState}))
+                if(socket != this.participants[user.userId]){
+                    this.participants[user.userId]?.send(JSON.stringify({type : "START_GAME", payload : this.GameState}))
                 }
             })
         }
@@ -201,7 +201,7 @@ export class SkribbleRoomManager {
 
         this.GameState = {
             ...this.GameState,
-            currentDrawing : this.participants[this.Players[this.GameState.indexOfUser].name],
+            currentDrawing : this.participants[this.Players[this.GameState.indexOfUser].userId],
             wordToGuess : parsedMessage.word,
         }
     }
