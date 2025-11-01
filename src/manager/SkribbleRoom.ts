@@ -165,7 +165,7 @@ export class SkribbleRoomManager {
             [message.username] : 0
         }
         this.Players.forEach((user)=>{
-            this.participants[user.name]?.send(JSON.stringify({type : "PLAYERS", players : this.Players, userId : message.userId}))
+            this.participants[user.userId]?.send(JSON.stringify({type : "PLAYERS", players : this.Players, userId : message.userId}))
         })
 
         console.log("this is the players in the room", this.Players)
@@ -175,9 +175,7 @@ export class SkribbleRoomManager {
     // }
 
     sendPlayersList(){
-        this.Players.forEach((user)=>{
-            this.participants[user.userId]?.send(JSON.stringify({type : "PLAYERS", players : this.Players, userId : user.userId}))
-        })
+        this.host.socket?.send(JSON.stringify({type : "PLAYERS", players : this.Players, userId : this.host.userId}))
     }
 
     startGame(socket : WebSocket, parsedMessage : any){
