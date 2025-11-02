@@ -100,6 +100,9 @@ export class UserManager {
             case "SKRIBBLE_STROKE":
                 room?.drawEvent(socket as WebSocket, message)
                 break;
+            case "SKRIBBLE_POINT":
+                room?.drawEvent(socket as WebSocket, message)
+                break;
             case "SKRIBBLE_UNDO":
                 room?.drawEvent(socket as WebSocket, message)
                 break;
