@@ -278,12 +278,39 @@ export class SkribbleRoomManager {
     //     })
     // }
 
+    private checkAllNonDrawersGuessed(): boolean {
+        // Get the current drawer
+        const currentDrawer = this.Players[this.GameState.indexOfUser];
+        
+        // Check if all players except the drawer have guessed
+        const allNonDrawersGuessed = this.Players.every((user) => {
+            // Drawer doesn't need to guess (they already know the word)
+            if (user.userId === currentDrawer.userId) {
+                return true;
+            }
+            // All non-drawers must have guessed
+            return user.wordGuessed === true;
+        });
+        
+        return allNonDrawersGuessed;
+    }
+
     message(ws : WebSocket, parsedMessage : any){
         const word  = this.GameState.wordToGuess
         if(parsedMessage.message===this.GameState.wordToGuess){
             let score: number
             this.Players.forEach((user)=>{
                 if(user.userId===parsedMessage.userId){
+                    // Don't allow drawer to guess their own word
+                    if(user.userId === this.Players[this.GameState.indexOfUser].userId){
+                        return;
+                    }
+                    
+                    // Don't allow multiple guesses from same player
+                    if(user.wordGuessed){
+                        return;
+                    }
+                    
                     user.wordGuessed = true
                     if(this.GameState.secondTime < this.GameSetting.timeSlot*0.20){
                         this.GameState.roundOverScoreState[user.userId] = 200
@@ -302,8 +329,13 @@ export class SkribbleRoomManager {
                         user.score = user.score + this.GameState.roundOverScoreState[user.userId]
                     }
                 }
-                this.participants[user.userId]?.send(JSON.stringify({type : "WORD_MATCHED", message: `${parsedMessage.userId} : Guessed the word`, userId : parsedMessage.userId}))
+                this.participants[user.userId]?.send(JSON.stringify({type : "WORD_MATCHED", message: `${parsedMessage.userId} : Guessed the word`, userId : parsedMessage.userId , word : this.GameState.wordToGuess}))
             })
+            
+            // Check if all non-drawers have guessed - if yes, end round immediately
+            if(this.GameState.gamePhase === "playing" && this.checkAllNonDrawersGuessed()){
+                this.endRound();
+            }
         }else if(word.slice(0, this.GameState.wordToGuess.length-1) === parsedMessage.message){
             this.Players.forEach((user)=>{
                 this.participants[user.userId]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.userId} : Close guess`}))
@@ -579,7 +611,7 @@ export class SkribbleRoomManager {
 
                     // Only proceed if game is still in a valid phase
                     if (this.GameState.gamePhase === "waiting" || this.GameState.gamePhase === "roundTransition") {
-                        this.Players.forEach((user) => {
+                this.Players.forEach((user) => {
                             if (user === this.Players[this.GameState.indexOfUser]) {
                                 // Current drawer gets the word
                                 this.participants[user.userId]?.send(JSON.stringify({
@@ -675,7 +707,7 @@ export class SkribbleRoomManager {
         this.GameState.transitionCountdown = 0;
 
         // Reset player states
-        this.Players.forEach((user) => {
+                        this.Players.forEach((user) => {
             user.wordGuessed = false;
             user.score = 0;
             this.GameState.roundOverScoreState[user.userId] = 0;
