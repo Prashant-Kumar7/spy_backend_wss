@@ -199,6 +199,7 @@ export class SkribbleRoomManager {
             // Initialize game state
             this.GameState.currentRoundNo = 1
             this.GameState.indexOfUser = 0
+            this.GameState.gamePhase = "waiting"  // Reset game phase to allow new game to start
 
             // Notify all players that game is starting
             this.broadcastToAll({
