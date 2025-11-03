@@ -46,12 +46,14 @@ export class RoomManager {
     private countdownTimers : NodeJS.Timeout[] = []
     private currentSpeakerIndex : number = 0
     private onRoomEmptyCallback?: () => void
+    public GameName : string
     
     constructor (Hostsocket :WebSocket, userId : string, roomId : string, gameMode : string, onRoomEmptyCallback?: () => void){
         this.host = {
             socket : Hostsocket,
             userId : userId
         }
+        this.GameName = "SpyGame"
         this.gameMode = gameMode
         this.roomId = roomId
         this.onRoomEmptyCallback = onRoomEmptyCallback

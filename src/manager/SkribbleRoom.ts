@@ -1,6 +1,4 @@
-import axios from "axios"
 import { WebSocket } from "ws"
-import { options } from "../index.js"
 
 interface RoomState {
     strokes  : string
@@ -27,6 +25,8 @@ interface RoundOverScoreState {
     [key : string] : number
 }
 
+type GamePhase = "waiting" | "playing" | "roundTransition" | "gameEnd"
+
 interface GameState {
     currentDrawing : WebSocket | null,
     indexOfUser : number
@@ -36,6 +36,10 @@ interface GameState {
     secondTime : number
     reveledIndex : number[]
     roundOverScoreState : RoundOverScoreState
+    gamePhase: GamePhase
+    transitionTimer: any
+    transitionCountdown: number
+    activeTimeouts: NodeJS.Timeout[]  // Track all setTimeout calls to prevent leaks
 }
 
 
@@ -122,11 +126,15 @@ export class SkribbleRoomManager {
             reveledIndex : [],
             roundOverScoreState : {
                 [userId] : 0
-            }
+            },
+            gamePhase: "waiting",
+            transitionTimer: null,
+            transitionCountdown: 0,
+            activeTimeouts: []
         }
         this.GameSetting = {
-            noOfRounds : 0,
-            timeSlot : 0,
+            noOfRounds : 3,
+            timeSlot : 30,
             diffuclty : "easy"
         }
     }
@@ -180,20 +188,27 @@ export class SkribbleRoomManager {
 
     startGame(socket : WebSocket, parsedMessage : any){
         if(socket === this.host.socket){
-            // this.randomizePlayers()
-            this.GameSetting = {
-                ...this.GameSetting,
-                timeSlot : parsedMessage.timeSlot,
-                noOfRounds : parsedMessage.noOfRounds,
-                diffuclty : parsedMessage.diffuclty
-            }
+            // Set game settings
+            // this.GameSetting = {
+            //     ...this.GameSetting,
+            //     timeSlot : parsedMessage.timeSlot,
+            //     noOfRounds : parsedMessage.noOfRounds,
+            //     diffuclty : parsedMessage.diffuclty
+            // }
 
-            // this.gameState(socket, parsedMessage)
-            this.Players.forEach((user)=>{
-                if(socket != this.participants[user.userId]){
-                    this.participants[user.userId]?.send(JSON.stringify({type : "START_GAME", payload : this.GameState}))
-                }
-            })
+            // Initialize game state
+            this.GameState.currentRoundNo = 1
+            this.GameState.indexOfUser = 0
+
+            // Notify all players that game is starting
+            this.broadcastToAll({
+                type: "START_GAME",
+                payload: this.GameState,
+                gameSetting: this.GameSetting
+            });
+
+            // Start the first round with proper sequence
+            this.startRoundSequence();
         }
     }
 
@@ -206,7 +221,7 @@ export class SkribbleRoomManager {
         }
     }
 
-    getRandomWord(){
+    getRandomWordFromList(): string {
         // Select random word from word list based on difficulty
         let filteredWords: string[] = [];
         
@@ -228,7 +243,12 @@ export class SkribbleRoomManager {
         
         // Pick random word from filtered list
         const randomIndex = Math.floor(Math.random() * filteredWords.length);
-        this.GameState.wordToGuess = filteredWords[randomIndex];
+        return filteredWords[randomIndex];
+    }
+
+    getRandomWord(){
+        // Select random word from word list based on difficulty
+        this.GameState.wordToGuess = this.getRandomWordFromList();
         
         // Send word to all players
         this.Players.forEach((user) => {
@@ -309,7 +329,6 @@ export class SkribbleRoomManager {
     }
 
     drawEvent(socket: WebSocket, parsedMessage : any){
-        console.log("this is the parsed message from the skribble room manager", parsedMessage)
         this.Players.forEach((user)=>{
             if(socket != this.participants[user.userId]){
                 this.participants[user.userId]?.send(JSON.stringify(parsedMessage))
@@ -320,167 +339,386 @@ export class SkribbleRoomManager {
     
     
     leave(socket : WebSocket , username : string){
+        // Clean up timers and reset state if needed
+        // If host leaves or game should end, clean everything
+        // For now, just leave the method as is but ensure cleanup is available
         // const index = this.participants.indexOf({socket : socket , username : username})
         // this.participants.splice(index, 1);
         // socket.close(1000 , "you left the room")
     }
 
+    // Complete cleanup method - call this when room is destroyed or game needs to be fully reset
+    cleanup() {
+        this.resetGameState();
+        // Clear any remaining references
+        this.GameState.currentDrawing = null;
+    }
 
-    async secondTimerOfGame(socket : WebSocket, message : any){
-        // this.usernames = this.usernames.sort(function(){return 0.5 - Math.random()})
-        const gameSettings = message.gameSettings
-        this.GameSetting.diffuclty = gameSettings.diffuclty
-        this.GameSetting.timeSlot = gameSettings.timeSlot
-        this.GameSetting.noOfRounds = gameSettings.rounds
-        this.GameState.currentRoundNo =  1
-        
-        function getRandomNumberInRange(min: number, max: number, excluded: number[]): number {
+
+    private getRandomNumberInRange(min: number, max: number, excluded: number[]): number {
             const numbers = Array.from({ length: max - min + 1 }, (_, i) => min + i).filter(n => !excluded.includes(n));
             if (numbers.length === 0) throw new Error("No numbers left to choose from");
             return numbers[Math.floor(Math.random() * numbers.length)];
         }
 
-        
-
-        const result = await axios.request(options)
-        this.GameState.wordToGuess = result.data.word
-        this.Players.forEach((user)=>{
-            if(user===this.Players[this.GameState.indexOfUser]){
-                this.participants[user.userId]?.send(JSON.stringify({type : "GET_WORD", word : this.GameState.wordToGuess, gameSetting : this.GameSetting, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId}))
-            }else{
-                this.participants[user.userId]?.send(JSON.stringify({type : "WORD_LENGTH", wordLength : this.GameState.wordToGuess.length, gameSetting : this.GameSetting, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId}))
+    private broadcastToAll(message: any) {
+        this.Players.forEach((user) => {
+            if (this.participants[user.userId]) {
+                this.participants[user.userId]?.send(JSON.stringify(message));
             }
-        })
+        });
+    }
+
+    private clearAllTimers() {
+        // Clear all setInterval timers
+        if (this.GameState.secondTimer) {
+            clearInterval(this.GameState.secondTimer);
+            this.GameState.secondTimer = null;
+        }
+        if (this.GameState.transitionTimer) {
+            clearInterval(this.GameState.transitionTimer);
+            this.GameState.transitionTimer = null;
+        }
+
+        // Clear all setTimeout timers
+        this.GameState.activeTimeouts.forEach((timeout) => {
+            clearTimeout(timeout);
+        });
+        this.GameState.activeTimeouts = [];
+    }
+
+    private trackTimeout(timeout: NodeJS.Timeout): NodeJS.Timeout {
+        this.GameState.activeTimeouts.push(timeout);
+        return timeout;
+    }
+
+    private startRoundTimer() {
+        // Clear any existing timer to prevent duplicates
+        if (this.GameState.secondTimer) {
+            clearInterval(this.GameState.secondTimer);
+            this.GameState.secondTimer = null;
+        }
+
+        // Reset round state
+        this.GameState.secondTime = 0;
+        this.GameState.reveledIndex = [];
+        this.GameState.gamePhase = "playing";
+        
+        // Reset wordGuessed for all players
+        this.Players.forEach((user) => {
+            user.wordGuessed = false;
+        });
+
+        // Start the round timer
         this.GameState.secondTimer = setInterval(() => {
-            this.GameState.secondTime = this.GameState.secondTime + 1
-            if(this.GameState.secondTime > this.GameSetting.timeSlot/2 && this.GameState.reveledIndex.length===0){
-                const randomNumber: number = getRandomNumberInRange(0,this.GameState.wordToGuess.length-1, this.GameState.reveledIndex)
-                this.GameState.reveledIndex.push(randomNumber)
-                this.Players.forEach((user)=>{
-                    this.participants[user.userId]?.send(JSON.stringify({type : "SECOND_TIMER", time: this.GameState.secondTime, reveledIndex : randomNumber, letterReveled : this.GameState.wordToGuess[randomNumber]}))
-                })
-            }else {
-                this.Players.forEach((user)=>{
-                    this.participants[user.userId]?.send(JSON.stringify({type : "SECOND_TIMER", time: this.GameState.secondTime}))
-                })
-            } 
-            
+            // Safety check: only run if game is still in playing phase
+            if (this.GameState.gamePhase !== "playing") {
+                clearInterval(this.GameState.secondTimer);
+                this.GameState.secondTimer = null;
+                return;
+            }
+
+            this.GameState.secondTime += 1;
+
+            // Check if time is up
+            if (this.GameState.secondTime >= this.GameSetting.timeSlot) {
+                this.endRound();
+                return;
+            }
+
+            // Reveal letter at halfway point
+            if (this.GameState.secondTime === Math.floor(this.GameSetting.timeSlot / 2) && this.GameState.reveledIndex.length === 0) {
+                const randomNumber: number = this.getRandomNumberInRange(
+                    0,
+                    this.GameState.wordToGuess.length - 1,
+                    this.GameState.reveledIndex
+                );
+                this.GameState.reveledIndex.push(randomNumber);
+                this.broadcastToAll({
+                    type: "SECOND_TIMER",
+                    time: this.GameState.secondTime,
+                    timeRemaining: this.GameSetting.timeSlot - this.GameState.secondTime,
+                    reveledIndex: randomNumber,
+                    letterReveled: this.GameState.wordToGuess[randomNumber]
+                });
+            } else {
+                // Broadcast timer update
+                this.broadcastToAll({
+                    type: "SECOND_TIMER",
+                    time: this.GameState.secondTime,
+                    timeRemaining: this.GameSetting.timeSlot - this.GameState.secondTime
+                });
+            }
         }, 1000);
     }
 
-    // Stop the second timer if needed
-    async stopSecondTimer(socket: WebSocket) {
-        function getRandomNumberInRange(min: number, max: number, excluded: number[]): number {
-            const numbers = Array.from({ length: max - min + 1 }, (_, i) => min + i).filter(n => !excluded.includes(n));
-            if (numbers.length === 0) throw new Error("No numbers left to choose from");
-            return numbers[Math.floor(Math.random() * numbers.length)];
-        }
-        this.GameState.reveledIndex.pop()
+    private endRound() {
+        // Stop the round timer
         if (this.GameState.secondTimer) {
-            console.log("Time stopped");
             clearInterval(this.GameState.secondTimer);
             this.GameState.secondTimer = null;
-            this.GameState.secondTime = 0;
-            // Notify clients that the timer has stopped
+        }
 
+        // Set phase to transition
+        this.GameState.gamePhase = "roundTransition";
+        
+        // Update scores for players who didn't guess
             this.Players.forEach((user) => {
-                if(!user.wordGuessed){
-                    user.score = user.score + 0
-                }
-                this.participants[user.userId]?.send(
-                    JSON.stringify({ type: "SECOND_TIMER_STOPPED", time: 0, roundScore : this.GameState.roundOverScoreState })
-                );
-            });
+            if (!user.wordGuessed) {
+                this.GameState.roundOverScoreState[user.userId] = 0;
+            }
+        });
 
+        // Broadcast round end
+        this.broadcastToAll({
+            type: "ROUND_END",
+            time: this.GameState.secondTime,
+            roundScore: this.GameState.roundOverScoreState
+        });
 
-            
-            if(this.GameState.indexOfUser < this.Players.length - 1){
-                this.GameState.indexOfUser = this.GameState.indexOfUser + 1 
-            }else {
-                this.GameState.indexOfUser = 0
-                this.GameState.currentRoundNo = this.GameState.currentRoundNo + 1
-                if(this.GameState.currentRoundNo > this.GameSetting.noOfRounds){
-                    console.log("game Over")
-                    this.GameState.currentRoundNo = 0
-                    this.GameState.indexOfUser=0
-                    this.GameState.wordToGuess = ""
-                    this.GameState.currentDrawing = null
-                    this.GameState.reveledIndex.pop()
-                    clearInterval(this.GameState.secondTimer);
-                    this.GameState.secondTimer = null;
-                    this.GameState.secondTime = 0;
-                    setTimeout(()=>{
-                        this.Players.forEach((user)=>{
-                            this.GameState.roundOverScoreState[user.userId] = 0
-                            this.participants[user.userId]?.send(JSON.stringify({type: "GAME_OVER", time: 0, ScoreCard : this.Players}))
-                        })
-                    },5000)
-                    
-                    return
-                }
+        // Start transition countdown (4 seconds)
+        this.GameState.transitionCountdown = 4;
+        this.startTransitionCountdown();
+    }
+
+    private startTransitionCountdown() {
+        // Clear any existing transition timer
+        if (this.GameState.transitionTimer) {
+            clearInterval(this.GameState.transitionTimer);
+            this.GameState.transitionTimer = null;
+        }
+
+        // Broadcast initial countdown
+        this.broadcastToAll({
+            type: "TRANSITION_COUNTDOWN",
+            countdown: this.GameState.transitionCountdown
+        });
+
+        // Start countdown timer
+        this.GameState.transitionTimer = setInterval(() => {
+            // Safety check: only run if game is still in transition phase
+            if (this.GameState.gamePhase !== "roundTransition") {
+                clearInterval(this.GameState.transitionTimer);
+                this.GameState.transitionTimer = null;
+                return;
             }
 
-            const result = await axios.request(options)
-            this.GameState.wordToGuess = result.data.word
-            setTimeout(()=>{
-                this.Players.forEach((user) => {
-                    this.GameState.roundOverScoreState[user.userId] = 0
-                    if(user===this.Players[this.GameState.indexOfUser]){
-                        this.participants[user.userId]?.send(JSON.stringify({ type: "WORD", word : this.GameState.wordToGuess, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId }));
-                    }else{
-                        this.participants[user.userId]?.send(JSON.stringify({ type: "WORD_LENGTH", wordLength : this.GameState.wordToGuess.length, currentRoundNo : this.GameState.currentRoundNo, currentUser : this.Players[this.GameState.indexOfUser].userId }));
-                    }
+            this.GameState.transitionCountdown -= 1;
+
+            if (this.GameState.transitionCountdown > 0) {
+                // Broadcast countdown update
+                this.broadcastToAll({
+                    type: "TRANSITION_COUNTDOWN",
+                    countdown: this.GameState.transitionCountdown
                 });
-            },4000)
+            } else {
+                // Countdown finished, transition to next round/player
+                clearInterval(this.GameState.transitionTimer);
+                this.GameState.transitionTimer = null;
+                this.transitionToNextRound();
+            }
+        }, 1000);
+    }
 
-            // Restart the timer after a 2-second delay
-            setTimeout(() => {
-                console.log("Restarting timer...");
-                this.GameState.secondTimer = setInterval(() => {
-                    this.GameState.secondTime += 1;
-                    if(this.GameState.secondTime > this.GameSetting.timeSlot/2 && this.GameState.reveledIndex.length===0){
+    private transitionToNextRound() {
+        // Reset round scores
+        this.Players.forEach((user) => {
+            this.GameState.roundOverScoreState[user.userId] = 0;
+        });
 
-                        const randomNumber: number = getRandomNumberInRange(0,this.GameState.wordToGuess.length-1, this.GameState.reveledIndex)
-                        this.GameState.reveledIndex.push(randomNumber)
-                        this.Players.forEach((user)=>{
-                            this.participants[user.userId]?.send(JSON.stringify({type : "SECOND_TIMER", time: this.GameState.secondTime, reveledIndex : randomNumber, letterReveled : this.GameState.wordToGuess[randomNumber],word : this.GameState.wordToGuess}))
-                        })
-                    }else {
-                        this.Players.forEach((user) => {
-                            this.participants[user.userId]?.send(
-                                JSON.stringify({ type: "SECOND_TIMER", time: this.GameState.secondTime, word : this.GameState.wordToGuess })
-                            );
-                        });
+        // Move to next player or next round
+        if (this.GameState.indexOfUser < this.Players.length - 1) {
+            // Next player in current round
+            this.GameState.indexOfUser += 1;
+        } else {
+            // Last player, move to next round
+            this.GameState.indexOfUser = 0;
+            this.GameState.currentRoundNo += 1;
+
+            // Check if game is over
+            if (this.GameState.currentRoundNo > this.GameSetting.noOfRounds) {
+                this.endGame();
+                return;
+            }
+        }
+
+        // Start the round sequence (round number → word → timer)
+        this.startRoundSequence();
+    }
+
+    private startRoundSequence() {
+        // Prevent overlapping sequences by clearing any existing timers first
+        this.clearAllTimers();
+
+        // Select new word
+        this.GameState.wordToGuess = this.getRandomWordFromList();
+
+        // Step 1: After 1 second, send round number to all players
+        const timeout1 = this.trackTimeout(setTimeout(() => {
+            // Remove from tracking after execution
+            const index = this.GameState.activeTimeouts.indexOf(timeout1);
+            if (index > -1) {
+                this.GameState.activeTimeouts.splice(index, 1);
+            }
+
+            // Only proceed if game is still in a valid phase
+            if (this.GameState.gamePhase === "waiting" || this.GameState.gamePhase === "roundTransition") {
+                this.broadcastToAll({
+                    type: "ROUND_NUMBER",
+                    currentRoundNo: this.GameState.currentRoundNo,
+                    currentUser: this.Players[this.GameState.indexOfUser].userId
+                });
+
+                // Step 2: After another 1 second (2 seconds total), send word/who's drawing
+                const timeout2 = this.trackTimeout(setTimeout(() => {
+                    // Remove from tracking after execution
+                    const index2 = this.GameState.activeTimeouts.indexOf(timeout2);
+                    if (index2 > -1) {
+                        this.GameState.activeTimeouts.splice(index2, 1);
                     }
-                }, 1000);
-            }, 10000); // 2-second delay before restarting
+
+                    // Only proceed if game is still in a valid phase
+                    if (this.GameState.gamePhase === "waiting" || this.GameState.gamePhase === "roundTransition") {
+                        this.Players.forEach((user) => {
+                            if (user === this.Players[this.GameState.indexOfUser]) {
+                                // Current drawer gets the word
+                                this.participants[user.userId]?.send(JSON.stringify({
+                                    type: "WORD",
+                                    word: this.GameState.wordToGuess,
+                                    currentRoundNo: this.GameState.currentRoundNo,
+                                    currentUser: this.Players[this.GameState.indexOfUser].userId
+                                }));
+                            } else {
+                                // Others get word length and who's drawing
+                                this.participants[user.userId]?.send(JSON.stringify({
+                                    type: "WORD_LENGTH",
+                                    wordLength: this.GameState.wordToGuess.length,
+                                    currentRoundNo: this.GameState.currentRoundNo,
+                                    currentUser: this.Players[this.GameState.indexOfUser].userId,
+                                    drawerName: this.Players[this.GameState.indexOfUser].name
+                                }));
+                            }
+                        });
+
+                        // Step 3: After another 2 seconds (4 seconds total from start), start the round timer
+                        const timeout3 = this.trackTimeout(setTimeout(() => {
+                            // Remove from tracking after execution
+                            const index3 = this.GameState.activeTimeouts.indexOf(timeout3);
+                            if (index3 > -1) {
+                                this.GameState.activeTimeouts.splice(index3, 1);
+                            }
+
+                            // Only start timer if game is still in a valid phase
+                            if (this.GameState.gamePhase === "waiting" || this.GameState.gamePhase === "roundTransition") {
+                                this.startRoundTimer();
+                            }
+                        }, 2000));
+                    }
+                }, 1000));
+            }
+        }, 1000));
+    }
+
+
+    private endGame() {
+        // Clear all timers first to prevent any new timer events
+        this.clearAllTimers();
+
+        // Set game phase to prevent any pending timeouts from executing
+        this.GameState.gamePhase = "gameEnd";
+
+        // Reset game state
+        this.GameState.currentRoundNo = 0;
+        this.GameState.indexOfUser = 0;
+        this.GameState.wordToGuess = "";
+        this.GameState.currentDrawing = null;
+        this.GameState.secondTime = 0;
+        this.GameState.reveledIndex = [];
+        this.GameState.transitionCountdown = 0;
+
+        // Reset round scores
+        this.Players.forEach((user) => {
+            this.GameState.roundOverScoreState[user.userId] = 0;
+        });
+
+        // Wait 2 seconds before sending game over (track this timeout)
+        const gameOverTimeout = this.trackTimeout(setTimeout(() => {
+            // Remove from tracking after execution
+            const index = this.GameState.activeTimeouts.indexOf(gameOverTimeout);
+            if (index > -1) {
+                this.GameState.activeTimeouts.splice(index, 1);
+            }
+
+            // Only send if game is still ended (hasn't been reset)
+            if (this.GameState.gamePhase === "gameEnd") {
+                this.broadcastToAll({
+                    type: "GAME_OVER",
+                    time: 0,
+                    ScoreCard: this.Players
+                });
+            }
+        }, 2000));
+    }
+
+    private resetGameState() {
+        // Clear all timers
+        this.clearAllTimers();
+
+        // Reset all game state
+        this.GameState.gamePhase = "waiting";
+        this.GameState.currentRoundNo = 0;
+        this.GameState.indexOfUser = 0;
+        this.GameState.wordToGuess = "";
+        this.GameState.currentDrawing = null;
+        this.GameState.secondTime = 0;
+        this.GameState.reveledIndex = [];
+        this.GameState.transitionCountdown = 0;
+
+        // Reset player states
+        this.Players.forEach((user) => {
+            user.wordGuessed = false;
+            user.score = 0;
+            this.GameState.roundOverScoreState[user.userId] = 0;
+        });
+    }
+
+    // Legacy method - kept for backward compatibility but game flow now starts from startGame()
+    async secondTimerOfGame(socket : WebSocket, message : any){
+        // This method is no longer needed as startGame() handles everything
+        // But kept for compatibility if client still sends GET_SKRIBBLE_WORD
+        if (this.GameState.gamePhase === "waiting") {
+            // If game hasn't started yet, initialize settings from message
+            const gameSettings = message.gameSettings
+            if (gameSettings) {
+                this.GameSetting.diffuclty = gameSettings.diffuclty
+                this.GameSetting.timeSlot = gameSettings.timeSlot
+                this.GameSetting.noOfRounds = gameSettings.rounds
+                this.GameState.currentRoundNo = 1
+                this.GameState.indexOfUser = 0
+                this.startRoundSequence();
+            }
+        }
+    }
+
+    // Stop the second timer manually (if needed by client, but server will auto-handle)
+    async stopSecondTimer(socket: WebSocket) {
+        // Manually trigger round end - server will handle the transition
+        if (this.GameState.gamePhase === "playing") {
+            this.endRound();
         }
     }
 
     // Start both timers (or individually if needed)
     
 
-    // Reset both timers
+    // Reset both timers and game state
     resetTimers(socket: WebSocket) {
-        
-        if (this.GameState.secondTimer) {
-            clearInterval(this.GameState.secondTimer);
-            this.GameState.secondTimer = null;
-            this.GameState.secondTime = 0;
-        }
-        socket.send(JSON.stringify({type: "TIMER_RESET"}));
+        this.resetGameState();
+        this.broadcastToAll({type: "TIMER_RESET"});
     }
 
     gameOver(){
-        if (this.GameState.secondTimer) {
-            console.log("game Over")
-            clearInterval(this.GameState.secondTimer);
-            this.GameState.secondTimer = null;
-            this.GameState.secondTime = 0;
-            this.Players.forEach((user)=>{
-            this.participants[user.userId]?.send(JSON.stringify({type: "GAME_OVER", time: 0}))
-            })
-        }
+        this.endGame();
     }
     
 }
