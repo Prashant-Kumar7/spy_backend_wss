@@ -297,7 +297,7 @@ export class SkribbleRoomManager {
 
     message(ws : WebSocket, parsedMessage : any){
         const word  = this.GameState.wordToGuess
-        if(parsedMessage.message===this.GameState.wordToGuess){
+        if(parsedMessage.message.toLowerCase()===this.GameState.wordToGuess.toLowerCase()){
             let score: number
             this.Players.forEach((user)=>{
                 if(user.userId===parsedMessage.userId){
@@ -336,7 +336,7 @@ export class SkribbleRoomManager {
             if(this.GameState.gamePhase === "playing" && this.checkAllNonDrawersGuessed()){
                 this.endRound();
             }
-        }else if(word.slice(0, this.GameState.wordToGuess.length-1) === parsedMessage.message){
+        }else if(word.slice(0, this.GameState.wordToGuess.length-1).toLowerCase() === parsedMessage.message.toLowerCase()){
             this.Players.forEach((user)=>{
                 this.participants[user.userId]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.userId} : Close guess`}))
             })
