@@ -632,7 +632,7 @@ export class SkribbleRoomManager {
                             }
                         });
 
-                        // Step 3: After another 2 seconds (4 seconds total from start), start the round timer
+                        // Step 3: After 3 seconds from sending word, start the round timer
                         const timeout3 = this.trackTimeout(setTimeout(() => {
                             // Remove from tracking after execution
                             const index3 = this.GameState.activeTimeouts.indexOf(timeout3);
@@ -644,7 +644,7 @@ export class SkribbleRoomManager {
                             if (this.GameState.gamePhase === "waiting" || this.GameState.gamePhase === "roundTransition") {
                                 this.startRoundTimer();
                             }
-                        }, 2000));
+                        }, 3000));
                     }
                 }, 1000));
             }
