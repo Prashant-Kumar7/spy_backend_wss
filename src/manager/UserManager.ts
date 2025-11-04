@@ -44,7 +44,7 @@ export class UserManager {
 
     SpyGameEventHandler(socket : WebSocket, message : any){
         if(message.type === "CREATE_ROOM"){
-            const room = new RoomManager(socket, message.userId, message.roomId, message.gameMode = "word_spy", () => {
+            const room = new RoomManager(socket, message.userId, message.name || "", message.roomId, message.gameMode = "word_spy", () => {
                 this.removeRoom(room.roomId)
             })
             this.rooms.set(message.roomId, room)
