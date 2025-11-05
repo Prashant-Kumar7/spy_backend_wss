@@ -176,9 +176,13 @@ export class UserManager {
             else if(message.EventFrom === "SkribbleGame"){
                 this.SkribbleGameEventHandler(socket, message)
             }else if(message.EventFrom === "AppChatMessaging"){
-                this.socketToUserId.get(message.reciverUserId)?.send(JSON.stringify(message))
+                this.socketToUserId.get(message.receiverID)?.send(JSON.stringify(message))
+                socket.send(JSON.stringify(message))
             }
 
+            // if(message.type === "send_friend_request"){
+            //     this.sendFriendRequest(socket, message)
+            // }
             
         })
 
@@ -194,5 +198,39 @@ export class UserManager {
     joinResponse(socket : WebSocket, status : boolean, message : string){
         socket.send(JSON.stringify({type : "join_response", status : status, message : message}))
     }
+
+    // sendFriendRequest(socket : WebSocket, message : any){
+    //     const receiverSocket = this.socketToUserId.get(message.targetUserId);
+    //     if(receiverSocket){
+    //         receiverSocket.send(JSON.stringify({type : "friend_request", senderUserId : message.senderUserId, senderName : message.senderName}))
+    //         socket.send(JSON.stringify({type : "send_friend_request_response", status : true, message : "friend request sent successfully"}))
+    //     } else {
+    //         fetch("http://localhost:3000/api/friend-request", {
+    //             method : "POST",
+    //             body : JSON.stringify({
+    //                 senderUserId : message.senderUserId,
+    //                 senderName : message.senderName,
+    //                 targetUserId : message.targetUserId,
+    //                 targetName : message.targetName
+    //             })
+    //         })
+    //         .then(response => response.json())
+    //         .then(data => {
+    //             console.log(data)
+    //             if(data.status){
+    //                 socket.send(JSON.stringify({type : "send_friend_request_response", status : true, message : "Friend request sent successfully"}))
+    //             } else {
+    //                 socket.send(JSON.stringify({type : "send_friend_request_response", status : false, message : "failed to send friend request"}))
+    //             }
+                
+    //         })
+    //         .catch(error => {
+    //             console.error(error)
+    //             socket.send(JSON.stringify({type : "send_friend_request_response", status : false, message : "failed to send friend request"}))
+    //         })
+    //     }
+
+        
+    // }
 
 }
