@@ -1,23 +1,21 @@
 import express from "express";
 import { WebSocketServer, WebSocket } from "ws";
 import { UserManager } from "./manager/UserManager.js";
-
+import { createClient } from "redis"
+import dotenv from "dotenv";
+dotenv.config();
 
 const app = express();
+
+export const redisClient = createClient({
+  url: process.env.REDIS_URL
+});
+
+redisClient.connect();
 
 app.get("/",(_,res)=>{
     res.json("hello from word spy websocket server")
 })
-
-export const options = {
-    method: 'GET',
-    url: 'https://pictionary-charades-word-generator.p.rapidapi.com/charades',
-    params: {difficulty: 'easy'},
-    headers: {
-      'x-rapidapi-key': process.env.RAPIDAPI_KEY,
-      'x-rapidapi-host': 'pictionary-charades-word-generator.p.rapidapi.com'
-    }
-};
 
 const httpServer = app.listen(8080);
 const wss = new WebSocketServer({ server: httpServer });

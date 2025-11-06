@@ -1,6 +1,7 @@
 import { WebSocket } from "ws";
 import { RoomManager } from "./RoomManager.js";
 import { SkribbleRoomManager } from "./SkribbleRoom.js";
+import { redisClient } from "../index.js";
 
 
 
@@ -78,6 +79,35 @@ export class UserManager {
         }
     }
 
+
+    AppEventHandler(socket : WebSocket, message : any){
+        if(message.type === "app_opened"){
+            console.log(`App opened by user: ${message.userId}`);
+            // The userId is already stored in socketToUserId mapping above
+            
+            // Check for pending messages in Redis and deliver all of them
+            if(message.userId){
+                const messageKey = `messages:${message.userId}`;
+                redisClient.lRange(messageKey, 0, -1)
+                    .then((pendingMessages) => {
+                        if(pendingMessages && pendingMessages.length > 0){
+                            console.log(`Delivering ${pendingMessages.length} pending message(s) to user ${message.userId}`);
+                            // Send all pending messages in order
+                            pendingMessages.forEach((msg) => {
+                                socket.send(msg);
+                            });
+                            // Delete the list after delivering all messages
+                            redisClient.del(messageKey).catch((error) => {
+                                console.error(`Error deleting message list for user ${message.userId}:`, error);
+                            });
+                        }
+                    })
+                    .catch((error) => {
+                        console.error(`Error retrieving pending messages for user ${message.userId}:`, error);
+                    });
+            }
+        }
+    }
 
     SkribbleGameEventHandler(socket : WebSocket, message : any){
         // const userId = message.userId
@@ -176,8 +206,24 @@ export class UserManager {
             else if(message.EventFrom === "SkribbleGame"){
                 this.SkribbleGameEventHandler(socket, message)
             }else if(message.EventFrom === "AppChatMessaging"){
-                this.socketToUserId.get(message.receiverID)?.send(JSON.stringify(message))
+                if(this.socketToUserId.get(message.receiverID)){
+                    this.socketToUserId.get(message.receiverID)?.send(JSON.stringify(message))
+                }else {
+                    // Store message in Redis list for offline delivery
+                    const messageKey = `messages:${message.receiverID}`;
+                    redisClient.rPush(messageKey, JSON.stringify(message))
+                        .then(() => {
+                            // Set expiration for the list (30 days)
+                            redisClient.expire(messageKey, 60 * 60 * 24 * 30);
+                        })
+                        .catch((error) => {
+                            console.error(`Error storing offline message for user ${message.receiverID}:`, error);
+                        });
+                }
+
                 socket.send(JSON.stringify(message))
+            }else if(message.EventFrom === "App"){
+                this.AppEventHandler(socket, message)
             }
 
             // if(message.type === "send_friend_request"){
