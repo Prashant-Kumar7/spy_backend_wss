@@ -42,6 +42,43 @@ export class UserManager {
         console.log(`Remaining rooms: ${this.rooms.size}`);
     }
 
+    /**
+     * Ensures unique mapping between userId and socket
+     * - If userId already mapped to different socket: removes old mapping
+     * - If socket already mapped to different userId: removes old mapping
+     * - Then sets the new mapping
+     */
+    private setUserIdSocketMapping(userId: string, socket: WebSocket): void {
+        // Validate socket is still open before mapping
+        if (socket.readyState !== WebSocket.OPEN) {
+            console.warn(`Cannot map userId ${userId} to closed socket`);
+            return;
+        }
+
+        // Check if userId is already mapped to a different socket
+        const existingSocket = this.socketToUserId.get(userId);
+        if (existingSocket && existingSocket !== socket) {
+            console.log(`User ${userId} reconnected with new socket. Cleaning up old socket mapping.`);
+            // Find and remove any userId that was mapped to the old socket
+            this.socketToUserId.forEach((socketValue, mappedUserId) => {
+                if (socketValue === existingSocket) {
+                    this.socketToUserId.delete(mappedUserId);
+                }
+            });
+        }
+
+        // Check if socket is already mapped to a different userId
+        this.socketToUserId.forEach((socketValue, mappedUserId) => {
+            if (socketValue === socket && mappedUserId !== userId) {
+                console.log(`Socket reassigned from user ${mappedUserId} to ${userId}. Removing old mapping.`);
+                this.socketToUserId.delete(mappedUserId);
+            }
+        });
+
+        // Set the new mapping
+        this.socketToUserId.set(userId, socket);
+    }
+
 
     SpyGameEventHandler(socket : WebSocket, message : any){
         if(message.type === "CREATE_ROOM"){
@@ -204,8 +241,9 @@ export class UserManager {
             const message = JSON.parse(data.toString())
             console.log("message is :", message)
             // Store socket to userId mapping for any message that contains userId
+            // This ensures uniqueness: one userId -> one socket, one socket -> one userId
             if (message.userId) {
-                this.socketToUserId.set(message.userId, socket);
+                this.setUserIdSocketMapping(message.userId, socket);
             }
 
             if(message.EventFrom === "SpyGame"){
