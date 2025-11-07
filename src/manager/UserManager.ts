@@ -190,6 +190,14 @@ export class UserManager {
         }
     }
 
+    FriendEventHandler(socket : WebSocket, message : any){
+        if(message.type === "request"){
+            this.socketToUserId.get(message.reciverUserId)?.send(JSON.stringify({type : "friend_request", senderUserId : message.senderUserId, senderName : message.senderName}))
+        }else if(message.type === "accept"){
+            this.socketToUserId.get(message.senderUserId)?.send(JSON.stringify({type : "friend_accept", reciverUserId : message.reciverUserId, reciverName : message.reciverName}))
+        }
+    }
+
     addHandler(socket : WebSocket){
         socket.on("message" , (data)=>{
 
@@ -221,14 +229,12 @@ export class UserManager {
                         });
                 }
 
-                socket.send(JSON.stringify(message))
+                // socket.send(JSON.stringify(message))
             }else if(message.EventFrom === "App"){
                 this.AppEventHandler(socket, message)
+            }else if(message.EventFrom === "Friend"){
+                this.FriendEventHandler(socket, message)
             }
-
-            // if(message.type === "send_friend_request"){
-            //     this.sendFriendRequest(socket, message)
-            // }
             
         })
 
