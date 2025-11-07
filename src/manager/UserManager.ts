@@ -129,8 +129,10 @@ export class UserManager {
                     .then((pendingMessages) => {
                         if(pendingMessages && pendingMessages.length > 0){
                             console.log(`Delivering ${pendingMessages.length} pending message(s) to user ${message.userId}`);
+                            console.log("pendingMessages is :", pendingMessages)
                             // Send all pending messages in order
                             pendingMessages.forEach((msg) => {
+
                                 socket.send(msg);
                             });
                             // Delete the list after delivering all messages
