@@ -259,7 +259,11 @@ export class UserManager {
                 }else {
                     // Store message in Redis list for offline delivery
                     const messageKey = `messages:${message.receiverID}`;
-                    redisClient.rPush(messageKey, JSON.stringify(message))
+                    const payload = {
+                        ...message,
+                        type : "queued_message"
+                    }
+                    redisClient.rPush(messageKey, JSON.stringify(payload))
                         .then(() => {
                             // Set expiration for the list (30 days)
                             redisClient.expire(messageKey, 60 * 60 * 24 * 30);
