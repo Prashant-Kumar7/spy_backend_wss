@@ -232,6 +232,15 @@ export class UserManager {
             case "SKRIBBLE_ROUND_END":
                 skribbleRoom?.stopSecondTimer(socket as WebSocket)
                 break;
+
+            case "invite_friend":
+                const receiverSocket = this.socketToUserId.get(message.FriendUserId);
+                if(receiverSocket){
+                    receiverSocket.send(JSON.stringify(message))
+                }else{
+                    socket.send(JSON.stringify({type : "friend_not_found"}))
+                }
+                break;
             default:
                 console.warn("Unhandled message type:", message.type);
                 break;
