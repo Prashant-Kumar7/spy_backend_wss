@@ -107,6 +107,15 @@ export class UserManager {
             }
         }
 
+        if(message.type === "invite_friend"){
+            const receiverSocket = this.socketToUserId.get(message.FriendUserId);
+            if(receiverSocket){
+                receiverSocket.send(JSON.stringify(message))
+            }else{
+                socket.send(JSON.stringify({type : "friend_not_found"}))
+            }
+        }
+
         const room = this.rooms.get(message.roomId);
         if(!room || !(room instanceof RoomManager)){
             socket.send(JSON.stringify({type : "spy_room_not_found"}))
@@ -155,7 +164,7 @@ export class UserManager {
         
         switch (message.type) {
             case "CREATE_SKRIBBLE_ROOM":
-                const newRoom = new SkribbleRoomManager(message.roomId, message.userId, message.PlayerName = "host",socket as WebSocket)
+                const newRoom = new SkribbleRoomManager(message.roomId, message.userId, message.PlayerName,socket as WebSocket)
                 this.rooms.set(message.roomId, newRoom)
                 this.joinResponse(socket, true, "You have created the room successfully")
                 newRoom.sendPlayersList()

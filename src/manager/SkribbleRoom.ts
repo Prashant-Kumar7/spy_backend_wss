@@ -330,7 +330,7 @@ export class SkribbleRoomManager {
                         user.score = user.score + this.GameState.roundOverScoreState[user.userId]
                     }
                 }
-                this.participants[user.userId]?.send(JSON.stringify({type : "WORD_MATCHED", message: `${parsedMessage.userId} : Guessed the word`, userId : parsedMessage.userId , word : this.GameState.wordToGuess}))
+                this.participants[user.userId]?.send(JSON.stringify({type : "WORD_MATCHED", message: `${parsedMessage.name} : Guessed the word`, userId : parsedMessage.userId , word : this.GameState.wordToGuess}))
             })
             
             // Check if all non-drawers have guessed - if yes, end round immediately
@@ -339,11 +339,11 @@ export class SkribbleRoomManager {
             }
         }else if(word.slice(0, this.GameState.wordToGuess.length-1).toLowerCase() === parsedMessage.message.toLowerCase()){
             this.Players.forEach((user)=>{
-                this.participants[user.userId]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.userId} : Close guess`}))
+                this.participants[user.userId]?.send(JSON.stringify({type : "CLOSE_GUESS", message: `${parsedMessage.name} : Close guess`}))
             })
         }else {
             this.Players.forEach((user)=>{
-                this.participants[user.userId]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.userId} : ${parsedMessage.message}`}))
+                this.participants[user.userId]?.send(JSON.stringify({type : "MESSAGE", message: `${parsedMessage.name} : ${parsedMessage.message}`}))
             })
         }
         
