@@ -139,22 +139,19 @@ export class SkribbleRoomManager {
         }
     }
 
-    // joinHttp(username : string,avatar : string){
-    //     this.usernames.push({
-    //         name : username,
-    //         score : 0,
-    //         wordGuessed: false,
-    //         avatar  : avatar
-    //     })
-    //     this.participants = {
-    //         ...this.participants,
-    //         [username] : null
-    //     }
-    //     this.GameState.roundOverScoreState = {
-    //         ...this.GameState.roundOverScoreState,
-    //         [username] : 0
-    //     }
-    // }
+    gameSettings(socket : WebSocket, message : any){
+        this.GameSetting = {
+            ...this.GameSetting,
+            timeSlot : message.settings.drawtime,
+            noOfRounds : message.settings.rounds,
+            diffuclty : message.settings.difficulty
+        }
+        this.Players.forEach((user) => {
+            if (this.participants[user.userId] && this.participants[user.userId] !== socket) {
+                this.participants[user.userId]?.send(JSON.stringify(message));
+            }
+        });
+    }
 
     joinRoom(socket : WebSocket, message : any){
         this.Players.push({

@@ -243,6 +243,10 @@ export class UserManager {
                     socket.send(JSON.stringify({type : "friend_not_found"}))
                 }
                 break;
+
+            case "SKRIBBLE_GAME_SETTINGS":
+                skribbleRoom?.gameSettings(socket as WebSocket, message)
+                break;
             default:
                 console.warn("Unhandled message type:", message.type);
                 break;
