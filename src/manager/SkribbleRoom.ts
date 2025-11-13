@@ -176,6 +176,8 @@ export class SkribbleRoomManager {
             this.participants[user.userId]?.send(JSON.stringify({type : "PLAYERS", players : this.Players, userId : message.userId}))
         })
 
+        socket.send(JSON.stringify({type : "PLAYER_ROLE", host : false}))
+
         console.log("this is the players in the room", this.Players)
     }
     // randomizePlayers() {

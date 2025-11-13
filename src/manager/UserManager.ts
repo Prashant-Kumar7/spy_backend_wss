@@ -168,6 +168,8 @@ export class UserManager {
                 this.rooms.set(message.roomId, newRoom)
                 this.joinResponse(socket, true, "You have created the room successfully")
                 newRoom.sendPlayersList()
+                socket.send(JSON.stringify({type : "PLAYER_ROLE", host : true}))
+
                 console.log("this is the skribble room created", newRoom)
                 break;
             case "JOIN_SKRIBBLE_ROOM":
