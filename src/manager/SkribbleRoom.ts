@@ -134,7 +134,7 @@ export class SkribbleRoomManager {
         }
         this.GameSetting = {
             noOfRounds : 3,
-            timeSlot : 30,
+            timeSlot : 80,
             diffuclty : "easy"
         }
     }
