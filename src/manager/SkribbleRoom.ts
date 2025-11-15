@@ -497,10 +497,12 @@ export class SkribbleRoomManager {
         
         // Update scores for players who didn't guess
             this.Players.forEach((user) => {
-            if (!user.wordGuessed) {
+            if (!user.wordGuessed && (user.userId !== this.Players[this.GameState.indexOfUser].userId)) {
                 this.GameState.roundOverScoreState[user.userId] = 0;
             }
         });
+
+        this.calculateDrawerScore();
 
         // Broadcast round end
         this.broadcastToAll({
@@ -512,6 +514,18 @@ export class SkribbleRoomManager {
         // Start transition countdown (4 seconds)
         this.GameState.transitionCountdown = 4;
         this.startTransitionCountdown();
+    }
+
+    calculateDrawerScore(){
+        const drawer = this.Players[this.GameState.indexOfUser];
+        const guesserRoundScores = this.Players
+            .filter((user) => user.userId !== drawer.userId && user.wordGuessed)
+            .map((user) => this.GameState.roundOverScoreState[user.userId] || 0);
+        const averageGuesserScore = guesserRoundScores.length > 0
+            ? guesserRoundScores.reduce((sum, val) => sum + val, 0) / guesserRoundScores.length
+            : 0;
+        this.GameState.roundOverScoreState[drawer.userId] = averageGuesserScore;
+        drawer.score += averageGuesserScore;
     }
 
     private startTransitionCountdown() {
