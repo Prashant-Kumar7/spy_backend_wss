@@ -98,6 +98,7 @@ export class SkribbleRoomManager {
     private GameState : GameState
     private Players : Players[]
     private GameSetting : GameSettings
+    public gameStarted : boolean
 
 
     constructor(roomId : string, userId : string, PlayerName : string,socket : WebSocket){
@@ -137,6 +138,7 @@ export class SkribbleRoomManager {
             timeSlot : 80,
             diffuclty : "easy"
         }
+        this.gameStarted = false
     }
 
     gameSettings(socket : WebSocket, message : any){
@@ -207,6 +209,8 @@ export class SkribbleRoomManager {
                 payload: this.GameState,
                 gameSetting: this.GameSetting
             });
+
+            this.gameStarted = true
 
             // Start the first round with proper sequence
             this.startRoundSequence();

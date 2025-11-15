@@ -3,21 +3,52 @@ import { RoomManager } from "./RoomManager.js";
 import { SkribbleRoomManager } from "./SkribbleRoom.js";
 import { redisClient } from "../index.js";
 
-
+interface User {
+    userId : string,
+    socket : WebSocket,
+    status : "Idle" | "InGame" | "InRoom"
+    // roomId? : string
+    // gameMode? : string
+    // playerName? : string
+    // playerRole? : "Host" | "Player"
+    // playerScore? : number
+    // playerWordGuessed? : boolean
+    // playerWord? : string
+}
 
 export class UserManager {
     // private rooms : 
     private rooms : Map<string, RoomManager | SkribbleRoomManager>;
-    private socketToUserId : Map<string, WebSocket>;
+    private socketToUserId : Map<string, User>;
 
     constructor(){
         this.rooms = new Map();
-        this.socketToUserId = new Map<string, WebSocket>();
+        this.socketToUserId = new Map<string, User>();
     }
 
 
     addUser(socket : WebSocket){
         this.addHandler(socket)
+    }
+
+    broadcastToAllUsers(userId : string, message : any){
+        this.socketToUserId.forEach((socketValue) => {
+            if(socketValue.userId != userId){
+                socketValue.socket.send(JSON.stringify(message))
+            }
+        })
+    }
+
+    private updateUserStatus(userId: string, status: "Idle" | "InGame" | "InRoom"): void {
+        const user = this.socketToUserId.get(userId);
+        if (user && user.status !== status) {
+            user.status = status;
+            this.broadcastToAllUsers(userId, {
+                type: "user_status_change",
+                userId: userId,
+                status: status
+            });
+        }
     }
 
     removeUser(socket : WebSocket){
@@ -28,9 +59,10 @@ export class UserManager {
             }
         });
         
-        // Remove from mapping
+        // Update status and remove from mapping
         this.socketToUserId.forEach((socketValue, userId) => {
-            if(socketValue === socket){
+            if(socketValue.socket === socket){
+                this.updateUserStatus(userId, "Idle");
                 this.socketToUserId.delete(userId);
             }
         })
@@ -57,11 +89,11 @@ export class UserManager {
 
         // Check if userId is already mapped to a different socket
         const existingSocket = this.socketToUserId.get(userId);
-        if (existingSocket && existingSocket !== socket) {
+        if (existingSocket && existingSocket.socket !== socket) {
             console.log(`User ${userId} reconnected with new socket. Cleaning up old socket mapping.`);
             // Find and remove any userId that was mapped to the old socket
             this.socketToUserId.forEach((socketValue, mappedUserId) => {
-                if (socketValue === existingSocket) {
+                if (socketValue.socket === existingSocket.socket) {
                     this.socketToUserId.delete(mappedUserId);
                 }
             });
@@ -69,14 +101,14 @@ export class UserManager {
 
         // Check if socket is already mapped to a different userId
         this.socketToUserId.forEach((socketValue, mappedUserId) => {
-            if (socketValue === socket && mappedUserId !== userId) {
+            if (socketValue.socket === socket && mappedUserId !== userId) {
                 console.log(`Socket reassigned from user ${mappedUserId} to ${userId}. Removing old mapping.`);
                 this.socketToUserId.delete(mappedUserId);
             }
         });
 
         // Set the new mapping
-        this.socketToUserId.set(userId, socket);
+        this.socketToUserId.set(userId, { userId, socket , status : "Idle"});
     }
 
 
@@ -86,6 +118,7 @@ export class UserManager {
                 this.removeRoom(room.roomId)
             })
             this.rooms.set(message.roomId, room)
+            this.updateUserStatus(message.userId, "InRoom")
             console.log("this is the room created", room)
         }
 
@@ -108,9 +141,9 @@ export class UserManager {
         }
 
         if(message.type === "invite_friend"){
-            const receiverSocket = this.socketToUserId.get(message.FriendUserId);
-            if(receiverSocket){
-                receiverSocket.send(JSON.stringify(message))
+            const receiverUser = this.socketToUserId.get(message.FriendUserId);
+            if(receiverUser){
+                receiverUser.socket.send(JSON.stringify(message))
             }else{
                 socket.send(JSON.stringify({type : "friend_not_found"}))
             }
@@ -121,6 +154,12 @@ export class UserManager {
             socket.send(JSON.stringify({type : "spy_room_not_found"}))
         }
         else{
+            if(message.type === "join_room" && message.userId){
+                this.updateUserStatus(message.userId, "InRoom");
+            }
+            else if(message.type === "leave_room" && message.userId){
+                this.updateUserStatus(message.userId, "Idle");
+            }
             room.handleMessage(socket, message)
         }
     }
@@ -166,6 +205,7 @@ export class UserManager {
             case "CREATE_SKRIBBLE_ROOM":
                 const newRoom = new SkribbleRoomManager(message.roomId, message.userId, message.PlayerName,socket as WebSocket)
                 this.rooms.set(message.roomId, newRoom)
+                this.updateUserStatus(message.userId, "InRoom")
                 this.joinResponse(socket, true, "You have created the room successfully")
                 newRoom.sendPlayersList()
                 socket.send(JSON.stringify({type : "PLAYER_ROLE", host : true}))
@@ -175,6 +215,7 @@ export class UserManager {
             case "JOIN_SKRIBBLE_ROOM":
                 if(skribbleRoom){
                     skribbleRoom.joinRoom(socket as WebSocket, message);
+                    this.updateUserStatus(message.userId, "InRoom")
                     this.joinResponse(socket, true, "You have joined the room successfully")
                 }
                 else{
@@ -222,7 +263,12 @@ export class UserManager {
                 skribbleRoom?.drawEvent(socket as WebSocket, message)
                 break;
             case "START_SKRIBBLE_GAME" : 
-                skribbleRoom?.startGame(socket as WebSocket, message)
+                if(skribbleRoom){
+                    skribbleRoom.startGame(socket as WebSocket, message)
+                    Object.keys(skribbleRoom.participants).forEach(userId => {
+                        this.updateUserStatus(userId, "InGame")
+                    })
+                }
                 break;
             case "GET_SKRIBBLE_WORD":
                 skribbleRoom?.secondTimerOfGame(socket as WebSocket, message)
@@ -236,9 +282,9 @@ export class UserManager {
                 break;
 
             case "invite_friend":
-                const receiverSocket = this.socketToUserId.get(message.FriendUserId);
-                if(receiverSocket){
-                    receiverSocket.send(JSON.stringify(message))
+                const receiverUser = this.socketToUserId.get(message.FriendUserId);
+                if(receiverUser){
+                    receiverUser.socket.send(JSON.stringify(message))
                 }else{
                     socket.send(JSON.stringify({type : "friend_not_found"}))
                 }
@@ -255,9 +301,9 @@ export class UserManager {
 
     FriendEventHandler(socket : WebSocket, message : any){
         if(message.type === "request"){
-            this.socketToUserId.get(message.reciverUserId)?.send(JSON.stringify({type : "friend_request", senderUserId : message.senderUserId, senderName : message.senderName}))
+            this.socketToUserId.get(message.reciverUserId)?.socket.send(JSON.stringify({type : "friend_request", senderUserId : message.senderUserId, senderName : message.senderName}))
         }else if(message.type === "accept"){
-            this.socketToUserId.get(message.senderUserId)?.send(JSON.stringify({type : "friend_accept", reciverUserId : message.reciverUserId, reciverName : message.reciverName}))
+            this.socketToUserId.get(message.senderUserId)?.socket.send(JSON.stringify({type : "friend_accept", reciverUserId : message.reciverUserId, reciverName : message.reciverName}))
         }
     }
 
@@ -279,7 +325,7 @@ export class UserManager {
                 this.SkribbleGameEventHandler(socket, message)
             }else if(message.EventFrom === "AppChatMessaging"){
                 if(this.socketToUserId.get(message.receiverID)){
-                    this.socketToUserId.get(message.receiverID)?.send(JSON.stringify(message))
+                    this.socketToUserId.get(message.receiverID)?.socket.send(JSON.stringify(message))
                 }else {
                     // Store message in Redis list for offline delivery
                     const messageKey = `messages:${message.receiverID}`;
