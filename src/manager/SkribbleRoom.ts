@@ -146,8 +146,9 @@ export class SkribbleRoomManager {
             noOfRounds : message.settings.rounds,
             diffuclty : message.settings.difficulty
         }
+        console.log("this is the game settings", this.GameSetting)
         this.Players.forEach((user) => {
-            if (this.participants[message.userId] !== socket) {
+            if (socket!== this.host.socket) {
                 this.participants[user.userId]?.send(JSON.stringify(message));
             }
         });
