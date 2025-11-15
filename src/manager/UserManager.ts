@@ -42,12 +42,18 @@ export class UserManager {
     private updateUserStatus(userId: string, status: "Idle" | "InGame" | "InRoom"): void {
         const user = this.socketToUserId.get(userId);
         if (user && user.status !== status) {
+            console.log(`[STATUS_UPDATE] User ${userId} status changed from "${user.status}" to "${status}"`);
             user.status = status;
             this.broadcastToAllUsers(userId, {
                 type: "user_status_change",
                 userId: userId,
                 status: status
             });
+            console.log(`[STATUS_BROADCAST] Broadcasting status change for user ${userId} to all other users`);
+        } else if (!user) {
+            console.log(`[STATUS_UPDATE] User ${userId} not found in socketToUserId map`);
+        } else if (user.status === status) {
+            console.log(`[STATUS_UPDATE] User ${userId} status is already "${status}", skipping update`);
         }
     }
 
