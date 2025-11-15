@@ -147,7 +147,7 @@ export class SkribbleRoomManager {
             diffuclty : message.settings.difficulty
         }
         this.Players.forEach((user) => {
-            if (this.participants[user.userId] && this.participants[user.userId] !== socket) {
+            if (this.participants[message.userId] !== socket) {
                 this.participants[user.userId]?.send(JSON.stringify(message));
             }
         });
