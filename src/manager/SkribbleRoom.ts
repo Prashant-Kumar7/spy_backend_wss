@@ -147,11 +147,11 @@ export class SkribbleRoomManager {
             diffuclty : message.settings.difficulty
         }
         console.log("this is the game settings", this.GameSetting)
-        this.Players.forEach((user) => {
-            if (socket!== this.host.socket) {
-                this.participants[user.userId]?.send(JSON.stringify(message));
+        this.Players.forEach((user)=>{
+            if(socket != this.participants[user.userId]){
+                this.participants[user.userId]?.send(JSON.stringify(message))
             }
-        });
+        })
     }
 
     joinRoom(socket : WebSocket, message : any){
