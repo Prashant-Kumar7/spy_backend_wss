@@ -93,13 +93,17 @@ export class UserManager {
             return;
         }
 
+        // Check if this is a new user or existing user
+        const existingUser = this.socketToUserId.get(userId);
+        const isNewUser = !existingUser;
+        const isReconnect = existingUser && existingUser.socket !== socket;
+
         // Check if userId is already mapped to a different socket
-        const existingSocket = this.socketToUserId.get(userId);
-        if (existingSocket && existingSocket.socket !== socket) {
+        if (existingUser && existingUser.socket !== socket) {
             console.log(`User ${userId} reconnected with new socket. Cleaning up old socket mapping.`);
             // Find and remove any userId that was mapped to the old socket
             this.socketToUserId.forEach((socketValue, mappedUserId) => {
-                if (socketValue.socket === existingSocket.socket) {
+                if (socketValue.socket === existingUser.socket) {
                     this.socketToUserId.delete(mappedUserId);
                 }
             });
@@ -115,6 +119,16 @@ export class UserManager {
 
         // Set the new mapping
         this.socketToUserId.set(userId, { userId, socket , status : "Idle"});
+        
+        // Broadcast initial status to all other users when new user connects
+        if (isNewUser || isReconnect) {
+            console.log(`[STATUS_BROADCAST] Broadcasting initial status for user ${userId} to all other users`);
+            this.broadcastToAllUsers(userId, {
+                type: "user_status_change",
+                userId: userId,
+                status: "Idle"
+            });
+        }
     }
 
 
