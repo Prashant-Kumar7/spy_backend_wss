@@ -138,13 +138,12 @@ export class UserManager {
         if (isNewUser || isReconnect) {
             console.log(`[STATUS_BROADCAST] Broadcasting initial status for user ${userId} to all other users`);
             this.broadcastToAllUsers(userId, {
-                type: "user_status_change",
-                userId: userId,
-                status: "Idle"
+                type: "users_online",
+                users: [userId]
             });
         }
 
-        socket.send(JSON.stringify({type : "users_list", users : Array.from(this.socketToUserId.keys())}))
+        socket.send(JSON.stringify({type : "users_online", users : Array.from(this.socketToUserId.keys())}))
     }
 
 
