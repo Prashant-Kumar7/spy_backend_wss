@@ -79,6 +79,8 @@ export class UserManager {
         this.rooms.forEach(room => {
             if (room instanceof RoomManager) {
                 room.handleDisconnection(socket);
+            } else if (room instanceof SkribbleRoomManager) {
+                room.handleDisconnection(socket);
             }
         });
         
@@ -238,7 +240,9 @@ export class UserManager {
         
         switch (message.type) {
             case "CREATE_SKRIBBLE_ROOM":
-                const newRoom = new SkribbleRoomManager(message.roomId, message.userId, message.PlayerName,socket as WebSocket)
+                const newRoom = new SkribbleRoomManager(message.roomId, message.userId, message.PlayerName,socket as WebSocket, () => {
+                    this.removeRoom(message.roomId)
+                })
                 this.rooms.set(message.roomId, newRoom)
                 this.updateUserStatus(message.userId, "InRoom")
                 this.joinResponse(socket, true, "You have created the room successfully")
@@ -327,6 +331,10 @@ export class UserManager {
 
             case "SKRIBBLE_GAME_SETTINGS":
                 skribbleRoom?.gameSettings(socket as WebSocket, message)
+                break;
+
+            case "LEAVE_SKRIBBLE_ROOM":
+                skribbleRoom?.leave(socket as WebSocket, message.userId)
                 break;
             default:
                 console.warn("Unhandled message type:", message.type);

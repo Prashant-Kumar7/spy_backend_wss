@@ -99,9 +99,10 @@ export class SkribbleRoomManager {
     private Players : Players[]
     private GameSetting : GameSettings
     public gameStarted : boolean
+    private onRoomEmptyCallback?: () => void
 
 
-    constructor(roomId : string, userId : string, PlayerName : string,socket : WebSocket){
+    constructor(roomId : string, userId : string, PlayerName : string,socket : WebSocket, onRoomEmptyCallback?: () => void){
         this.participants = {
             [userId] : socket
         }
@@ -139,6 +140,7 @@ export class SkribbleRoomManager {
             diffuclty : "easy"
         }
         this.gameStarted = false
+        this.onRoomEmptyCallback = onRoomEmptyCallback
     }
 
     gameSettings(socket : WebSocket, message : any){
@@ -375,13 +377,107 @@ export class SkribbleRoomManager {
 
     
     
-    leave(socket : WebSocket , username : string){
-        // Clean up timers and reset state if needed
-        // If host leaves or game should end, clean everything
-        // For now, just leave the method as is but ensure cleanup is available
-        // const index = this.participants.indexOf({socket : socket , username : username})
-        // this.participants.splice(index, 1);
-        // socket.close(1000 , "you left the room")
+    handleDisconnection(socket: WebSocket) {
+        // Find the userId for this socket
+        let disconnectedUserId: string | null = null;
+        for (const [userId, userSocket] of Object.entries(this.participants)) {
+            if (userSocket === socket) {
+                disconnectedUserId = userId;
+                break;
+            }
+        }
+
+        if (disconnectedUserId) {
+            // Clear timers if game is in progress
+            if (this.gameStarted) {
+                this.clearAllTimers();
+            }
+            
+            // Handle as leave
+            this.leave(socket, disconnectedUserId);
+        }
+    }
+
+    leave(socket : WebSocket , userId : string){
+        // Check if the current drawer is leaving BEFORE removing them (for game state handling)
+        const wasCurrentDrawer = this.gameStarted && 
+                                 this.GameState.indexOfUser < this.Players.length && 
+                                 this.Players[this.GameState.indexOfUser]?.userId === userId;
+        
+        // Find the index of the leaving player before removal (for index adjustment)
+        const leavingPlayerIndex = this.Players.findIndex(p => p.userId === userId);
+
+        // Handle host leaving
+        if(userId === this.host.userId){
+            delete this.participants[userId]
+            this.Players = this.Players.filter(player => player.userId !== userId)
+            delete this.GameState.roundOverScoreState[userId]
+            
+            // Check if there are still players left to assign new host
+            if (this.Players.length > 0) {
+                this.host.userId = this.Players[0].userId
+                this.host.socket = this.participants[this.host.userId] || null
+                
+                // Notify new host
+                if (this.host.socket) {
+                    this.host.socket.send(JSON.stringify({type : "PLAYER_ROLE", host : true}))
+                }
+            }
+        } else {
+            // Regular player leaving
+            delete this.participants[userId]
+            this.Players = this.Players.filter(player => player.userId !== userId)
+            delete this.GameState.roundOverScoreState[userId]
+        }
+
+        // Handle game state if game is in progress
+        if(this.gameStarted){
+            // If the current drawer left, end the round
+            if (wasCurrentDrawer) {
+                this.clearAllTimers();
+                // Reset indexOfUser since the drawer left
+                this.GameState.indexOfUser = 0;
+                if (this.GameState.gamePhase === "playing") {
+                    // End round but skip drawer score calculation since drawer left
+                    this.endRoundAfterDrawerLeft();
+                }
+            } else if (leavingPlayerIndex !== -1 && leavingPlayerIndex < this.GameState.indexOfUser) {
+                // If a player before the current drawer left, adjust the index
+                this.GameState.indexOfUser--;
+            }
+            
+            // Notify all remaining players
+            this.broadcastToAll({
+                type: "PLAYER_LEFT",
+                userId: userId
+            });
+        } else {
+            // Game not started, just update player list
+            this.broadcastToAll({
+                type: "PLAYERS",
+                players: this.Players
+            });
+        }
+
+        // Check if room is empty and cleanup if needed
+        this.checkAndCleanupRoom();
+    }
+
+    isRoomEmpty(): boolean {
+        return this.Players.length === 0
+    }
+
+    checkAndCleanupRoom() {
+        if (this.isRoomEmpty()) {
+            console.log(`SkribbleRoom ${this.roomId} is empty, cleaning up...`)
+            this.clearAllTimers()
+            this.resetGameState()
+            
+            // Notify UserManager to remove this room
+            if (this.onRoomEmptyCallback) {
+                this.onRoomEmptyCallback()
+            }
+        }
     }
 
     // Complete cleanup method - call this when room is destroyed or game needs to be fully reset
@@ -499,14 +595,54 @@ export class SkribbleRoomManager {
         // Set phase to transition
         this.GameState.gamePhase = "roundTransition";
         
-        // Update scores for players who didn't guess
+        // Check if current drawer still exists (in case they disconnected)
+        const currentDrawer = this.Players[this.GameState.indexOfUser];
+        if (currentDrawer) {
+            // Update scores for players who didn't guess
             this.Players.forEach((user) => {
-            if (!user.wordGuessed && (user.userId !== this.Players[this.GameState.indexOfUser].userId)) {
+                if (!user.wordGuessed && (user.userId !== currentDrawer.userId)) {
+                    this.GameState.roundOverScoreState[user.userId] = 0;
+                }
+            });
+
+            this.calculateDrawerScore();
+        } else {
+            // Drawer left, reset scores for all remaining players
+            this.Players.forEach((user) => {
+                if (!user.wordGuessed) {
+                    this.GameState.roundOverScoreState[user.userId] = 0;
+                }
+            });
+        }
+
+        // Broadcast round end
+        this.broadcastToAll({
+            type: "ROUND_END",
+            time: this.GameState.secondTime,
+            roundScore: this.GameState.roundOverScoreState
+        });
+
+        // Start transition countdown (4 seconds)
+        this.GameState.transitionCountdown = 4;
+        this.startTransitionCountdown();
+    }
+
+    private endRoundAfterDrawerLeft() {
+        // Stop the round timer
+        if (this.GameState.secondTimer) {
+            clearInterval(this.GameState.secondTimer);
+            this.GameState.secondTimer = null;
+        }
+
+        // Set phase to transition
+        this.GameState.gamePhase = "roundTransition";
+        
+        // Reset scores for all remaining players since drawer left
+        this.Players.forEach((user) => {
+            if (!user.wordGuessed) {
                 this.GameState.roundOverScoreState[user.userId] = 0;
             }
         });
-
-        this.calculateDrawerScore();
 
         // Broadcast round end
         this.broadcastToAll({
