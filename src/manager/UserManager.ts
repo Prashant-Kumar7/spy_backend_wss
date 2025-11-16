@@ -58,6 +58,23 @@ export class UserManager {
     }
 
     removeUser(socket : WebSocket){
+        // Find the userId for this socket before removing
+        let disconnectedUserId: string | null = null;
+        this.socketToUserId.forEach((socketValue, userId) => {
+            if(socketValue.socket === socket){
+                disconnectedUserId = userId;
+            }
+        });
+
+        // Broadcast offline status to all other connected users
+        if(disconnectedUserId){
+            console.log(`[USER_OFFLINE] User ${disconnectedUserId} went offline, notifying all connected users`);
+            this.broadcastToAllUsers(disconnectedUserId, {
+                type: "user_offline",
+                userId: disconnectedUserId
+            });
+        }
+
         // Find and handle user leaving from all rooms
         this.rooms.forEach(room => {
             if (room instanceof RoomManager) {
@@ -65,13 +82,10 @@ export class UserManager {
             }
         });
         
-        // Update status and remove from mapping
-        this.socketToUserId.forEach((socketValue, userId) => {
-            if(socketValue.socket === socket){
-                this.updateUserStatus(userId, "Idle");
-                this.socketToUserId.delete(userId);
-            }
-        })
+        // Remove from mapping
+        if(disconnectedUserId){
+            this.socketToUserId.delete(disconnectedUserId);
+        }
     }
 
     removeRoom(roomId: string) {
