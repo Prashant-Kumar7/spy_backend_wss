@@ -143,6 +143,8 @@ export class UserManager {
                 status: "Idle"
             });
         }
+
+        socket.send(JSON.stringify({type : "users_list", users : Array.from(this.socketToUserId.keys())}))
     }
 
 
