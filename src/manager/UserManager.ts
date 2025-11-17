@@ -141,11 +141,11 @@ export class UserManager {
             console.log(`[STATUS_BROADCAST] Broadcasting initial status for user ${userId} to all other users`);
             this.broadcastToAllUsers(userId, {
                 type: "users_online",
-                users: [userId]
+                users: [{userId : userId, status : "Idle"}]
             });
         }
-
-        socket.send(JSON.stringify({type : "users_online", users : Array.from(this.socketToUserId.keys())}))
+        const users = Array.from(this.socketToUserId.values()).map(user => ({userId : user.userId, status : user.status}))
+        socket.send(JSON.stringify({type : "users_online", users : users}))
     }
 
 
