@@ -133,19 +133,21 @@ export class UserManager {
             }
         });
 
-        // Set the new mapping
-        this.socketToUserId.set(userId, { userId, socket , status : "Idle"});
+        // Set the new mapping - preserve existing status if user already exists
+        const preservedStatus = existingUser?.status || "Idle";
+        this.socketToUserId.set(userId, { userId, socket , status : preservedStatus});
         
-        // Broadcast initial status to all other users when new user connects
+        // Broadcast initial status to all other users when new user connects or reconnects
         if (isNewUser || isReconnect) {
             console.log(`[STATUS_BROADCAST] Broadcasting initial status for user ${userId} to all other users`);
             this.broadcastToAllUsers(userId, {
                 type: "users_online",
-                users: [{userId : userId, status : "Idle"}]
+                users: [{userId : userId, status : preservedStatus}]
             });
+            // Send full user list to the new/reconnecting user
+            const users = Array.from(this.socketToUserId.values()).map(user => ({userId : user.userId, status : user.status}))
+            socket.send(JSON.stringify({type : "users_online", users : users}))
         }
-        const users = Array.from(this.socketToUserId.values()).map(user => ({userId : user.userId, status : user.status}))
-        socket.send(JSON.stringify({type : "users_online", users : users}))
     }
 
 
