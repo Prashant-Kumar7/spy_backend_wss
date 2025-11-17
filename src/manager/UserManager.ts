@@ -335,6 +335,9 @@ export class UserManager {
 
             case "LEAVE_SKRIBBLE_ROOM":
                 skribbleRoom?.leave(socket as WebSocket, message.userId)
+                if(message.userId){
+                    this.updateUserStatus(message.userId, "Idle");
+                }
                 break;
             default:
                 console.warn("Unhandled message type:", message.type);
