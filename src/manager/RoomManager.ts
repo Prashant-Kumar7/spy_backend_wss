@@ -494,11 +494,13 @@ export class RoomManager {
                 this.sendJoinRoomFailure(socket, "full")
                 return
             }
-            socket.send(JSON.stringify({type : "room_seat_available", userId : message.userId}))
+            // socket.send(JSON.stringify({type : "room_seat_available", userId : message.userId}))
 
             this.participants[message.userId] = socket
             this.playerList.push({ userId: message.userId, name: message.name || "" })
             this.roomState.readyStatus[message.userId] = false
+            socket.send(JSON.stringify({type : "join_room_response", status : true, message : "You have joined the room successfully", roomId : this.roomId}))
+
             console.log(this.playerList , this.roomState)
         }
 
