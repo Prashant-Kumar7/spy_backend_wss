@@ -271,7 +271,9 @@ export class UserManager {
                     .filter(room => room instanceof SkribbleRoomManager && !room.gameStarted) as SkribbleRoomManager[]
                 const randomSkribbleRoom = skribbleRoomList[Math.floor(Math.random() * skribbleRoomList.length)]
                 if(randomSkribbleRoom){
-                    socket.send(JSON.stringify({type : "quick_join_skribble_response", roomId : randomSkribbleRoom.roomId}))
+                    socket.send(JSON.stringify({type : "quick_join_response", status : true, roomId : randomSkribbleRoom.roomId}))
+                } else {
+                    socket.send(JSON.stringify({type : "quick_join_response", status : false, message : "No rooms available"}))
                 }
                 break;
             case "SKRIBBLE_TOOL_CHANGE":

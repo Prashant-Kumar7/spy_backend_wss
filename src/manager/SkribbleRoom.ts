@@ -160,8 +160,11 @@ export class SkribbleRoomManager {
 
     sendJoinRoomEvents(socket: WebSocket, userId: string) {
         socket.send(JSON.stringify({type : "join_room_response", status : true, message : "You have joined the room successfully", roomId : this.roomId}))
-        socket.send(JSON.stringify({type : "PLAYER_ROLE", host : false}))
-        
+        if(userId === this.host.userId){
+            socket.send(JSON.stringify({type : "PLAYER_ROLE", host : true}))
+        }else{
+            socket.send(JSON.stringify({type : "PLAYER_ROLE", host : false}))
+        }        
         // Broadcast updated players list to all players
         this.Players.forEach((user) => {
             this.participants[user.userId]?.send(JSON.stringify({type : "PLAYERS", players : this.Players, userId : userId}))
