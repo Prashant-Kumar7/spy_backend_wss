@@ -153,7 +153,7 @@ export class UserManager {
 
     SpyGameEventHandler(socket : WebSocket, message : any){
         if(message.type === "CREATE_ROOM"){
-            const room = new RoomManager(socket, message.userId, message.name || "", message.roomId, message.gameMode = "word_spy", () => {
+            const room = new RoomManager(socket, message.userId, message.name || "", message.roomId, message.gameMode, () => {
                 this.removeRoom(room.roomId)
             })
             this.rooms.set(message.roomId, room)
@@ -170,7 +170,7 @@ export class UserManager {
             }
         }
 
-        if(message.type === "QUICK_JOIN_WORDLESS_SPY"){
+        if(message.type === "QUICK_JOIN_wordless_SPY"){
             const roomGameModeList = Array.from(this.rooms.values())
                 .filter(room => room instanceof RoomManager && room.gameMode === "wordless_spy") as RoomManager[]
             const randomRoom = roomGameModeList[Math.floor(Math.random() * roomGameModeList.length)]

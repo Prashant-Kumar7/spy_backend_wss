@@ -507,7 +507,7 @@ export class RoomManager {
                     this.roomState.spy.word = spyWord.spy
                 }
                 else{
-                    this.roomState.spy.word = "Wordless"
+                    this.roomState.spy.word = "wordless"
                 }
                 this.roomState.civilianWord = spyWord.civilian
                 
