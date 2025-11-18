@@ -15,11 +15,12 @@ interface Host {
     userId : string
 }
 
-interface GameSettings {
-    timeSlot : number,
-    diffuclty : "hard" | "easy" | "medium",
-    noOfRounds : number
-}
+type GameSettings = {
+    players: number;
+    drawtime: number;
+    rounds: number;
+    difficulty: 'easy' | 'medium' | 'hard';
+};
 
 interface RoundOverScoreState {
     [key : string] : number
@@ -135,9 +136,10 @@ export class SkribbleRoomManager {
             activeTimeouts: []
         }
         this.GameSetting = {
-            noOfRounds : 3,
-            timeSlot : 80,
-            diffuclty : "easy"
+            players: 0,
+            drawtime: 80,
+            rounds: 3,
+            difficulty: "easy"
         }
         this.gameStarted = false
         this.onRoomEmptyCallback = onRoomEmptyCallback
@@ -146,9 +148,10 @@ export class SkribbleRoomManager {
     gameSettings(socket : WebSocket, message : any){
         this.GameSetting = {
             ...this.GameSetting,
-            timeSlot : message.settings.drawtime,
-            noOfRounds : message.settings.rounds,
-            diffuclty : message.settings.difficulty
+            players: message.settings.players,
+            drawtime: message.settings.drawtime,
+            rounds: message.settings.rounds,
+            difficulty: message.settings.difficulty
         }
         console.log("this is the game settings", this.GameSetting)
         this.Players.forEach((user)=>{
@@ -161,9 +164,9 @@ export class SkribbleRoomManager {
     sendJoinRoomEvents(socket: WebSocket, userId: string) {
         socket.send(JSON.stringify({type : "join_room_response", status : true, message : "You have joined the room successfully", roomId : this.roomId}))
         if(userId === this.host.userId){
-            socket.send(JSON.stringify({type : "PLAYER_ROLE", host : true}))
+            socket.send(JSON.stringify({type : "PLAYER_ROLE", host : true, gameSetting : this.GameSetting}))
         }else{
-            socket.send(JSON.stringify({type : "PLAYER_ROLE", host : false}))
+            socket.send(JSON.stringify({type : "PLAYER_ROLE", host : false, gameSetting : this.GameSetting}))
         }        
         // Broadcast updated players list to all players
         this.Players.forEach((user) => {
@@ -253,10 +256,10 @@ export class SkribbleRoomManager {
         // Select random word from word list based on difficulty
         let filteredWords: string[] = [];
         
-        if (this.GameSetting.diffuclty === "easy") {
+        if (this.GameSetting.difficulty === "easy") {
             // First 100 words (0-99) are easy
             filteredWords = WordList.slice(0, 100);
-        } else if (this.GameSetting.diffuclty === "medium") {
+        } else if (this.GameSetting.difficulty === "medium") {
             // Next 100 words (100-199) are medium
             filteredWords = WordList.slice(100, 200);
         } else {
@@ -340,16 +343,16 @@ export class SkribbleRoomManager {
                     }
                     
                     user.wordGuessed = true
-                    if(this.GameState.secondTime < this.GameSetting.timeSlot*0.20){
+                    if(this.GameState.secondTime < this.GameSetting.drawtime*0.20){
                         this.GameState.roundOverScoreState[user.userId] = 200
                         user.score = user.score + this.GameState.roundOverScoreState[user.userId]
-                    }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.40){
+                    }else if(this.GameState.secondTime < this.GameSetting.drawtime*0.40){
                         this.GameState.roundOverScoreState[user.userId] = (0.80)*200
                         user.score = user.score + this.GameState.roundOverScoreState[user.userId]
-                    }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.60){
+                    }else if(this.GameState.secondTime < this.GameSetting.drawtime*0.60){
                         this.GameState.roundOverScoreState[user.userId] = (0.60)*200
                         user.score = user.score + this.GameState.roundOverScoreState[user.userId]
-                    }else if(this.GameState.secondTime < this.GameSetting.timeSlot*0.80){
+                    }else if(this.GameState.secondTime < this.GameSetting.drawtime*0.80){
                         this.GameState.roundOverScoreState[user.userId] = (0.40)*200
                         user.score = user.score + this.GameState.roundOverScoreState[user.userId]
                     }else {
@@ -575,13 +578,13 @@ export class SkribbleRoomManager {
             this.GameState.secondTime += 1;
 
             // Check if time is up
-            if (this.GameState.secondTime >= this.GameSetting.timeSlot) {
+            if (this.GameState.secondTime >= this.GameSetting.drawtime) {
                 this.endRound();
                 return;
             }
 
             // Reveal letter at halfway point
-            if (this.GameState.secondTime === Math.floor(this.GameSetting.timeSlot / 2) && this.GameState.reveledIndex.length === 0) {
+            if (this.GameState.secondTime === Math.floor(this.GameSetting.drawtime / 2) && this.GameState.reveledIndex.length === 0) {
                 const randomNumber: number = this.getRandomNumberInRange(
                     0,
                     this.GameState.wordToGuess.length - 1,
@@ -591,7 +594,7 @@ export class SkribbleRoomManager {
                 this.broadcastToAll({
                     type: "SECOND_TIMER",
                     time: this.GameState.secondTime,
-                    timeRemaining: this.GameSetting.timeSlot - this.GameState.secondTime,
+                    timeRemaining: this.GameSetting.drawtime - this.GameState.secondTime,
                     reveledIndex: randomNumber,
                     letterReveled: this.GameState.wordToGuess[randomNumber]
                 });
@@ -600,7 +603,7 @@ export class SkribbleRoomManager {
                 this.broadcastToAll({
                     type: "SECOND_TIMER",
                     time: this.GameState.secondTime,
-                    timeRemaining: this.GameSetting.timeSlot - this.GameState.secondTime
+                    timeRemaining: this.GameSetting.drawtime - this.GameState.secondTime
                 });
             }
         }, 1000);
@@ -744,7 +747,7 @@ export class SkribbleRoomManager {
             this.GameState.currentRoundNo += 1;
 
             // Check if game is over
-            if (this.GameState.currentRoundNo > this.GameSetting.noOfRounds) {
+            if (this.GameState.currentRoundNo > this.GameSetting.rounds) {
                 this.endGame();
                 return;
             }
@@ -898,9 +901,10 @@ export class SkribbleRoomManager {
             // If game hasn't started yet, initialize settings from message
             const gameSettings = message.gameSettings
             if (gameSettings) {
-                this.GameSetting.diffuclty = gameSettings.diffuclty
-                this.GameSetting.timeSlot = gameSettings.timeSlot
-                this.GameSetting.noOfRounds = gameSettings.rounds
+                this.GameSetting.players = gameSettings.players
+                this.GameSetting.drawtime = gameSettings.drawtime
+                this.GameSetting.rounds = gameSettings.rounds
+                this.GameSetting.difficulty = gameSettings.difficulty
                 this.GameState.currentRoundNo = 1
                 this.GameState.indexOfUser = 0
                 this.startRoundSequence();
