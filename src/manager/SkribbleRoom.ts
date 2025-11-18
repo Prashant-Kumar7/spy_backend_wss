@@ -158,6 +158,24 @@ export class SkribbleRoomManager {
         })
     }
 
+    sendJoinRoomEvents(socket: WebSocket, userId: string) {
+        socket.send(JSON.stringify({type : "join_room_response", status : true, message : "You have joined the room successfully", roomId : this.roomId}))
+        socket.send(JSON.stringify({type : "PLAYER_ROLE", host : false}))
+        
+        // Broadcast updated players list to all players
+        this.Players.forEach((user) => {
+            this.participants[user.userId]?.send(JSON.stringify({type : "PLAYERS", players : this.Players, userId : userId}))
+        })
+    }
+
+    sendJoinRoomFailure(socket: WebSocket, reason: "not_found" | "full") {
+        if (reason === "full") {
+            socket.send(JSON.stringify({type : "join_room_response", status : false, message : "Room is full", roomId : this.roomId}))
+        } else {
+            socket.send(JSON.stringify({type : "join_room_response", status : false, message : "Room not found", roomId : this.roomId}))
+        }
+    }
+
     joinRoom(socket : WebSocket, message : any){
         this.Players.push({
             userId : message.userId,
@@ -174,13 +192,13 @@ export class SkribbleRoomManager {
             ...this.GameState.roundOverScoreState,
             [message.userId] : 0
         }
-        this.Players.forEach((user)=>{
-            this.participants[user.userId]?.send(JSON.stringify({type : "PLAYERS", players : this.Players, userId : message.userId}))
-        })
-
-        socket.send(JSON.stringify({type : "PLAYER_ROLE", host : false}))
-
         console.log("this is the players in the room", this.Players)
+    }
+
+    getJoinEvents(socket: WebSocket, userId: string) {
+        if(this.Players.some(p => p.userId === userId)){
+            this.sendJoinRoomEvents(socket, userId)
+        }
     }
     // randomizePlayers() {
     //     this.usernames = this.usernames.sort(function(){return 0.5 - Math.random()})

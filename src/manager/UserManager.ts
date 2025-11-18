@@ -163,16 +163,16 @@ export class UserManager {
 
         if(message.type === "QUICK_JOIN_WORD_SPY"){
             const roomGameModeList = Array.from(this.rooms.values())
-                .filter(room => room instanceof RoomManager && room.gameMode === "word_spy") as RoomManager[]
+                .filter(room => room instanceof RoomManager && room.gameMode === "word_spy" && !room.gameStarted && !room.isFull()) as RoomManager[]
             const randomRoom = roomGameModeList[Math.floor(Math.random() * roomGameModeList.length)]
             if(randomRoom){
                 socket.send(JSON.stringify({type : "quick_join_response", roomId : randomRoom.roomId, gameMode : "word_spy"}))
             }
         }
 
-        if(message.type === "QUICK_JOIN_wordless_SPY"){
+        if(message.type === "QUICK_JOIN_WORDLESS_SPY"){
             const roomGameModeList = Array.from(this.rooms.values())
-                .filter(room => room instanceof RoomManager && room.gameMode === "wordless_spy") as RoomManager[]
+                .filter(room => room instanceof RoomManager && room.gameMode === "wordless_spy" && !room.gameStarted && !room.isFull()) as RoomManager[]
             const randomRoom = roomGameModeList[Math.floor(Math.random() * roomGameModeList.length)]
             if(randomRoom){
                 socket.send(JSON.stringify({type : "quick_join_response", roomId : randomRoom.roomId, gameMode : "wordless_spy"}))
@@ -190,6 +190,9 @@ export class UserManager {
 
         const room = this.rooms.get(message.roomId);
         if(!room || !(room instanceof RoomManager)){
+            if(message.type === "join_room"){
+                socket.send(JSON.stringify({type : "join_room_response", status : false, message : "Room not found", roomId : message.roomId}))
+            }
             socket.send(JSON.stringify({type : "spy_room_not_found"}))
         }
         else{
@@ -257,10 +260,18 @@ export class UserManager {
                 if(skribbleRoom){
                     skribbleRoom.joinRoom(socket as WebSocket, message);
                     this.updateUserStatus(message.userId, "InRoom")
-                    this.joinResponse(socket, true, "You have joined the room successfully")
                 }
                 else{
+                    socket.send(JSON.stringify({type : "join_room_response", status : false, message : "Room not found", roomId : message.roomId}))
                     this.joinResponse(socket, false, "Room not found")
+                }
+                break;
+            case "QUICK_JOIN_SKRIBBLE_ROOM":
+                const skribbleRoomList = Array.from(this.rooms.values())
+                    .filter(room => room instanceof SkribbleRoomManager && !room.gameStarted) as SkribbleRoomManager[]
+                const randomSkribbleRoom = skribbleRoomList[Math.floor(Math.random() * skribbleRoomList.length)]
+                if(randomSkribbleRoom){
+                    socket.send(JSON.stringify({type : "quick_join_skribble_response", roomId : randomSkribbleRoom.roomId}))
                 }
                 break;
             case "SKRIBBLE_TOOL_CHANGE":
@@ -341,6 +352,16 @@ export class UserManager {
                     this.updateUserStatus(message.userId, "Idle");
                 }
                 break;
+
+            case "GET_JOIN_EVENTS":
+                if(skribbleRoom){
+                    skribbleRoom.getJoinEvents(socket as WebSocket, message.userId)
+                }
+                else{
+                    socket.send(JSON.stringify({type : "join_room_response", status : false, message : "Room not found", roomId : message.roomId}))
+                }
+                break;
+
             default:
                 console.warn("Unhandled message type:", message.type);
                 break;

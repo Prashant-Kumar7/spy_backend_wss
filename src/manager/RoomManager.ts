@@ -50,6 +50,7 @@ export class RoomManager {
     private currentSpeakerIndex : number = 0
     private onRoomEmptyCallback?: () => void
     public GameName : string
+    public gameStarted : boolean
     
     constructor (Hostsocket :WebSocket, userId : string, name : string, roomId : string, gameMode : string, onRoomEmptyCallback?: () => void){
         this.host = {
@@ -64,6 +65,7 @@ export class RoomManager {
             [this.host.userId] : this.host.socket
         }
         this.playerList = [{ userId: this.host.userId, name: name }]
+        this.gameStarted = false
         this.roomState = {
             chats : [],
             readyStatus : {
@@ -84,6 +86,39 @@ export class RoomManager {
 
     pickRandomPlayer(){
         return this.playerList[Math.floor(Math.random() * this.playerList.length)].userId
+    }
+
+    getPlayerCount(): number {
+        return this.playerList.length
+    }
+
+    isFull(): boolean {
+        return this.playerList.length >= 6
+    }
+
+    sendJoinRoomEvents(socket: WebSocket, userId: string, isReconnect: boolean = false) {
+        if (isReconnect) {
+            socket.send(JSON.stringify({type : "join_room_response", status : true, message : "You are already in the room", roomId : this.roomId}))
+        } else {
+            socket.send(JSON.stringify({type : "join_room_response", status : true, message : "You have joined the room successfully", roomId : this.roomId}))
+        }
+        socket.send(JSON.stringify({type : "room_state", roomState : this.roomState}))
+        socket.send(JSON.stringify({type : "game_mode", gameMode : this.gameMode}))
+        
+        // Broadcast updated player list to all players
+        this.playerList.forEach(player => {
+            if (this.participants[player.userId]) {
+                this.participants[player.userId].send(JSON.stringify({type : "playerList", playerList : this.playerList}))
+            }
+        })
+    }
+
+    sendJoinRoomFailure(socket: WebSocket, reason: "full" | "not_found") {
+        if (reason === "full") {
+            socket.send(JSON.stringify({type : "join_room_response", status : false, message : "Room is full", roomId : this.roomId}))
+        } else {
+            socket.send(JSON.stringify({type : "join_room_response", status : false, message : "Room not found", roomId : this.roomId}))
+        }
     }
 
     pickRandomWord(){
@@ -131,6 +166,7 @@ export class RoomManager {
     }
 
     resetGameState() {
+        this.gameStarted = false;
         this.roomState.gameStarted = false;
         this.roomState.spy = {
             word: "",
@@ -451,20 +487,11 @@ export class RoomManager {
 
             if(this.playerList.some(p => p.userId === message.userId)){
                 this.participants[message.userId] = socket
-                // socket.send(JSON.stringify({type : "player_already_in_room", roomState : this.roomState, playerList : this.playerList}))
-                socket.send(JSON.stringify({type : "room_state", roomState : this.roomState}))
-                socket.send(JSON.stringify({type : "game_mode", gameMode : this.gameMode}))
-
-                this.playerList.forEach(player => {
-                    if (this.participants[player.userId]) {
-                        this.participants[player.userId].send(JSON.stringify({type : "playerList", playerList : this.playerList}))
-                    }
-                })
                 return
             }
 
             if(this.playerList.length >= 6){
-                socket.send(JSON.stringify({type : "room_full"}))
+                this.sendJoinRoomFailure(socket, "full")
                 return
             }
             socket.send(JSON.stringify({type : "room_seat_available", userId : message.userId}))
@@ -472,14 +499,15 @@ export class RoomManager {
             this.participants[message.userId] = socket
             this.playerList.push({ userId: message.userId, name: message.name || "" })
             this.roomState.readyStatus[message.userId] = false
-            socket.send(JSON.stringify({type : "room_state", roomState : this.roomState}))
-
-            this.playerList.forEach(player => {
-                if (this.participants[player.userId]) {
-                    this.participants[player.userId].send(JSON.stringify({type : "playerList", playerList : this.playerList}))
-                }
-            })
             console.log(this.playerList , this.roomState)
+        }
+
+        if(message.type === "GET_JOIN_EVENTS"){
+            if(this.playerList.some(p => p.userId === message.userId)){
+                this.sendJoinRoomEvents(socket, message.userId, true)
+            } else {
+                this.sendJoinRoomEvents(socket, message.userId, false)
+            }
         }
 
         if(message.type === "ready"){
@@ -491,6 +519,7 @@ export class RoomManager {
             })
             console.log("condition for game to start is :", (Object.values(this.roomState.readyStatus).every(status => status)) && (this.playerList.length >= 3))
             if(Object.values(this.roomState.readyStatus).every(status => status) && this.playerList.length >= 3){
+                this.gameStarted = true
                 this.roomState.gameStarted = true
                 this.playerList.forEach(player => {
                     if (this.participants[player.userId]) {
