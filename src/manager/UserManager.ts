@@ -166,7 +166,9 @@ export class UserManager {
                 .filter(room => room instanceof RoomManager && room.gameMode === "word_spy" && !room.gameStarted && !room.isFull()) as RoomManager[]
             const randomRoom = roomGameModeList[Math.floor(Math.random() * roomGameModeList.length)]
             if(randomRoom){
-                socket.send(JSON.stringify({type : "quick_join_response", roomId : randomRoom.roomId, gameMode : "word_spy"}))
+                socket.send(JSON.stringify({type : "quick_join_response", status : true, roomId : randomRoom.roomId, gameMode : "word_spy"}))
+            }else {
+                socket.send(JSON.stringify({type : "quick_join_response", status : false, message : "No rooms available"}))
             }
         }
 
@@ -175,7 +177,9 @@ export class UserManager {
                 .filter(room => room instanceof RoomManager && room.gameMode === "wordless_spy" && !room.gameStarted && !room.isFull()) as RoomManager[]
             const randomRoom = roomGameModeList[Math.floor(Math.random() * roomGameModeList.length)]
             if(randomRoom){
-                socket.send(JSON.stringify({type : "quick_join_response", roomId : randomRoom.roomId, gameMode : "wordless_spy"}))
+                socket.send(JSON.stringify({type : "quick_join_response", status : true, roomId : randomRoom.roomId, gameMode : "wordless_spy"}))
+            }else {
+                socket.send(JSON.stringify({type : "quick_join_response", status : false, message : "No rooms available"}))
             }
         }
 
