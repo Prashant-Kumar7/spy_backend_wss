@@ -382,7 +382,13 @@ export class UserManager {
                 senderName : message.senderName
             }
             console.log("friend request reach the request block and the payload is", playload)
-            this.socketToUserId.get(message.reciverUserId)?.socket.send(JSON.stringify(playload))
+            console.log("reciver user is", this.socketToUserId.get(message.reciverUserId))
+            if(this.socketToUserId.get(message.reciverUserId)){
+                console.log("reciver user found")
+                this.socketToUserId.get(message.reciverUserId)!.socket.send(JSON.stringify(playload))
+            }else{
+                console.log("reciver user not found")
+            }
         }else if(message.type === "accept"){
             const paylaod = {
                 type : "friend_accept", 
