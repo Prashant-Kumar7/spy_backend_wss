@@ -254,20 +254,19 @@ export class UserManager {
                 })
                 this.rooms.set(message.roomId, newRoom)
                 this.updateUserStatus(message.userId, "InRoom")
-                this.joinResponse(socket, true, "You have created the room successfully")
-                newRoom.sendPlayersList()
-                socket.send(JSON.stringify({type : "PLAYER_ROLE", host : true}))
-
+                socket.send(JSON.stringify({type : "create_room_response", status : true, message : "You have created the room successfully", roomId : message.roomId}))
+                // newRoom.sendPlayersList()
+                // socket.send(JSON.stringify({type : "PLAYER_ROLE", host : true}))
                 console.log("this is the skribble room created", newRoom)
                 break;
             case "JOIN_SKRIBBLE_ROOM":
                 if(skribbleRoom){
                     skribbleRoom.joinRoom(socket as WebSocket, message);
                     this.updateUserStatus(message.userId, "InRoom")
+                    socket.send(JSON.stringify({type : "join_room_response", status : true, message : "You have joined the room successfully", roomId : message.roomId}))
                 }
                 else{
                     socket.send(JSON.stringify({type : "join_room_response", status : false, message : "Room not found", roomId : message.roomId}))
-                    this.joinResponse(socket, false, "Room not found")
                 }
                 break;
             case "QUICK_JOIN_SKRIBBLE_ROOM":
