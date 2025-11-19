@@ -158,6 +158,7 @@ export class UserManager {
             })
             this.rooms.set(message.roomId, room)
             this.updateUserStatus(message.userId, "InRoom")
+            socket.send(JSON.stringify({type : "create_room_response", status : true, message : "You have created the room successfully", roomId : message.roomId}))
             console.log("this is the room created", room)
         }
 
@@ -263,7 +264,6 @@ export class UserManager {
                 if(skribbleRoom){
                     skribbleRoom.joinRoom(socket as WebSocket, message);
                     this.updateUserStatus(message.userId, "InRoom")
-                    socket.send(JSON.stringify({type : "join_room_response", status : true, message : "You have joined the room successfully", roomId : message.roomId}))
                 }
                 else{
                     socket.send(JSON.stringify({type : "join_room_response", status : false, message : "Room not found", roomId : message.roomId}))
@@ -433,10 +433,6 @@ export class UserManager {
             console.log("user removed")
         })
 
-    }
-
-    joinResponse(socket : WebSocket, status : boolean, message : string){
-        socket.send(JSON.stringify({type : "join_response", status : status, message : message}))
     }
 
     // sendFriendRequest(socket : WebSocket, message : any){
