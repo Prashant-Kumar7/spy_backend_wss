@@ -379,6 +379,7 @@ export class UserManager {
                 type : "friend_request", 
                 senderUserId : message.senderUserId, 
                 reciverUserId : message.receiverUserId,
+                senderName : message.senderName
             }
             console.log("friend request reach the request block and the payload is", playload)
             this.socketToUserId.get(message.reciverUserId)?.socket.send(JSON.stringify(playload))
