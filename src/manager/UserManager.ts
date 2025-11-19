@@ -378,9 +378,7 @@ export class UserManager {
             const playload = {
                 type : "friend_request", 
                 senderUserId : message.senderUserId, 
-                senderName : message.senderName,
-                reciverUserId : message.reciverUserId,
-                reciverName : message.reciverName
+                reciverUserId : message.receiverUserId,
             }
             console.log("friend request reach the request block and the payload is", playload)
             this.socketToUserId.get(message.reciverUserId)?.socket.send(JSON.stringify(playload))
@@ -388,9 +386,7 @@ export class UserManager {
             const paylaod = {
                 type : "friend_accept", 
                 reciverUserId : message.reciverUserId, 
-                reciverName : message.reciverName,
                 senderUserId : message.senderUserId,
-                senderName : message.senderName
             }
             console.log("friend accept reach the accept block and the payload is", paylaod)
             this.socketToUserId.get(message.senderUserId)?.socket.send(JSON.stringify(paylaod))
