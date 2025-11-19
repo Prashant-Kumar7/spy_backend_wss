@@ -437,6 +437,7 @@ export class UserManager {
             }else if(message.EventFrom === "App"){
                 this.AppEventHandler(socket, message)
             }else if(message.EventFrom === "Friend"){
+                console.log("friend event reach the friend block and the payload is", message)
                 this.FriendEventHandler(socket, message)
             }
             
